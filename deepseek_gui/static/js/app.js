@@ -421,4 +421,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   pollLogs();
   setInterval(pollLogs, 2500);
+// 11. WINDOW CONTROLS (PYWEBVIEW INTEGRATION)
+  const btnWinMinimize = document.getElementById('btnWinMinimize');
+  const btnWinMaximize = document.getElementById('btnWinMaximize');
+  const btnWinClose = document.getElementById('btnWinClose');
+
+  if (btnWinMinimize) {
+    btnWinMinimize.addEventListener('click', () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.minimize) {
+        window.pywebview.api.minimize();
+      }
+    });
+  }
+
+  if (btnWinMaximize) {
+    btnWinMaximize.addEventListener('click', () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_maximize) {
+        window.pywebview.api.toggle_maximize();
+      }
+    });
+  }
+
+  if (btnWinClose) {
+    btnWinClose.addEventListener('click', () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.close) {
+        window.pywebview.api.close();
+      } else {
+        window.close();
+      }
+    });
+  }
 });

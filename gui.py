@@ -1,6 +1,6 @@
 """
-DeepSeek API Studio - Native Desktop GUI Launcher
-Runs Flask backend and opens native desktop window via pywebview / Chrome app mode.
+Uroboros - Native Desktop GUI Launcher
+Runs Flask backend and opens frameless desktop window via pywebview / Chrome app mode.
 """
 import os
 import socket
@@ -16,6 +16,33 @@ ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from deepseek_gui.app import app
+
+
+class WindowApi:
+    """Bridge for JavaScript to control frameless window (minimize, maximize, close)."""
+    def __init__(self):
+        self.window = None
+        self._is_maximized = False
+
+    def set_window(self, window):
+        self.window = window
+
+    def minimize(self):
+        if self.window:
+            self.window.minimize()
+
+    def toggle_maximize(self):
+        if self.window:
+            if self._is_maximized:
+                self.window.restore()
+                self._is_maximized = False
+            else:
+                self.window.maximize()
+                self._is_maximized = True
+
+    def close(self):
+        if self.window:
+            self.window.destroy()
 
 
 def find_free_port(default_port: int = 5000) -> int:
@@ -67,44 +94,49 @@ def main():
     server_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     server_thread.start()
 
-    # Wait for server to be responsive
-    time.sleep(1.0)
+    # Wait for server to start
+    time.sleep(0.8)
 
     print("\n" + "=" * 65)
-    print("      DEEPSEEK API STUDIO - ANTIGRAVITY GUI")
+    print("      UROBOROS - DEEPSEEK REVERSE API STUDIO")
     print(f"      Backend server running at: {url}")
     print("=" * 65 + "\n")
 
-    # Try pywebview first
+    api = WindowApi()
     launched = False
+
     try:
         import webview
-        print("[GUI] Opening native pywebview window...")
-        webview.create_window(
-            title="DeepSeek API Studio",
+        print("[GUI] Launching frameless Uroboros window...")
+        window = webview.create_window(
+            title="Uroboros",
             url=url,
             width=1380,
             height=880,
             background_color="#111113",
+            frameless=True,
+            resizable=True,
+            easy_drag=True,
             text_select=True,
+            js_api=api,
         )
+        api.set_window(window)
         webview.start()
         launched = True
     except Exception as e:
-        print(f"[GUI Note] pywebview window: {e}. Falling back to Chrome App Mode...")
+        print(f"[GUI Note] pywebview frameless mode: {e}. Falling back to Chrome App Mode...")
 
     if not launched:
-        # Fallback to Chrome App mode (looks and feels like a native desktop app)
+        # Fallback to Chrome App mode
         if launch_chrome_app(url):
-            print("[GUI] Opened in Chrome App Mode.")
+            print("[GUI] Opened Uroboros in Chrome App Mode.")
             try:
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
                 print("\n[GUI] Closing...")
         else:
-            # Fallback to default browser
-            print("[GUI] Opening in default browser...")
+            print("[GUI] Opening Uroboros in default browser...")
             webbrowser.open(url)
             try:
                 while True:

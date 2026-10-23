@@ -3,17 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DeepSeek API Studio - Antigravity UI</title>
+  <title>Uroboros</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
-  <!-- 1. TOP WINDOW BAR -->
-  <header class="top-title-bar">
+  <!-- 1. TOP WINDOW BAR (FRAMELESS & DRAGGABLE) -->
+  <header class="top-title-bar pywebview-drag-region">
     <div class="window-nav">
       <div class="app-title-logo">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <span>Antigravity</span>
+        <!-- Uroboros Infinity Icon -->
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.267-8-12.356-8-5.096 0-5.096 8 0 8 5.09 0 7.261-8 12.356-8Z"/>
+        </svg>
+        <span>Uroboros</span>
       </div>
       <nav class="window-menu">
         <span>File</span>
@@ -25,9 +28,9 @@
       Uroboros / DeepSeek API Automation With Selenium
     </div>
     <div class="window-controls">
-      <span>&#8212;</span>
-      <span>&#9633;</span>
-      <span>&#10005;</span>
+      <button class="win-ctrl-btn" id="btnWinMinimize" title="Свернуть">&#8212;</button>
+      <button class="win-ctrl-btn" id="btnWinMaximize" title="Развернуть">&#9633;</button>
+      <button class="win-ctrl-btn close" id="btnWinClose" title="Закрыть">&#10005;</button>
     </div>
   </header>
 
