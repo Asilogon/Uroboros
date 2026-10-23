@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Environment
+.env
+venv/
+env/
+
+# DeepSeek session data & profile
+data/session.json
+data/chrome_profile/
+logs/traffic.log
+logs/requests.jsonl
+logs/files/*
+!logs/files/.gitkeep
+sample_upload.txt
+demo_doc.txt
