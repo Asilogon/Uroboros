@@ -1,7 +1,6 @@
 """
 Uroboros - Native Desktop GUI Launcher
 Runs Flask backend and opens frameless desktop window via pywebview / Chrome app mode.
-Eliminates white flashes using hidden initialization and instant dark background.
 """
 import os
 import socket
@@ -20,30 +19,41 @@ from deepseek_gui.app import app
 
 
 class WindowApi:
-    """Bridge for JavaScript to control frameless window (minimize, maximize, close)."""
+    """Bridge for JavaScript to control window. Uses webview.active_window() without storing COM references."""
     def __init__(self):
-        self.window = None
         self._is_maximized = False
 
-    def set_window(self, window):
-        self.window = window
-
     def minimize(self):
-        if self.window:
-            self.window.minimize()
+        try:
+            import webview
+            win = webview.active_window()
+            if win:
+                win.minimize()
+        except Exception:
+            pass
 
     def toggle_maximize(self):
-        if self.window:
-            if self._is_maximized:
-                self.window.restore()
-                self._is_maximized = False
-            else:
-                self.window.maximize()
-                self._is_maximized = True
+        try:
+            import webview
+            win = webview.active_window()
+            if win:
+                if self._is_maximized:
+                    win.restore()
+                    self._is_maximized = False
+                else:
+                    win.maximize()
+                    self._is_maximized = True
+        except Exception:
+            pass
 
     def close(self):
-        if self.window:
-            self.window.destroy()
+        try:
+            import webview
+            win = webview.active_window()
+            if win:
+                win.destroy()
+        except Exception:
+            pass
 
 
 def find_free_port(default_port: int = 5000) -> int:
@@ -96,7 +106,7 @@ def main():
     server_thread.start()
 
     # Wait for server to be responsive
-    time.sleep(0.5)
+    time.sleep(0.6)
 
     print("\n" + "=" * 65)
     print("      UROBOROS - DEEPSEEK REVERSE API STUDIO")
@@ -109,8 +119,7 @@ def main():
     try:
         import webview
         print("[GUI] Launching frameless Uroboros window...")
-        # hidden=True prevents 1-second white frame while WebView2 initializes
-        window = webview.create_window(
+        webview.create_window(
             title="Uroboros",
             url=url,
             width=1380,
@@ -118,25 +127,14 @@ def main():
             background_color="#111113",
             frameless=True,
             resizable=True,
-            hidden=True,
             easy_drag=True,
             text_select=True,
             js_api=api,
         )
-        api.set_window(window)
-
-        # Smoothly reveal window once DOM and dark stylesheet are applied
-        def reveal_window():
-            time.sleep(0.4)
-            if window:
-                window.show()
-
-        threading.Thread(target=reveal_window, daemon=True).start()
-
         webview.start()
         launched = True
     except Exception as e:
-        print(f"[GUI Note] pywebview frameless mode: {e}. Falling back to Chrome App Mode...")
+        print(f"[GUI Note] pywebview error: {e}. Falling back to Chrome App Mode...")
 
     if not launched:
         if launch_chrome_app(url):
