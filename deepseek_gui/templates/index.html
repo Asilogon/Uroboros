@@ -1,291 +1,773 @@
 <!DOCTYPE html>
-<html lang="ru" style="background-color: #111113; margin: 0; padding: 0; border: none;">
+<html lang="ru" data-theme="{{ initial_theme or 'dark' }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Uroboros</title>
-  <style>
-    html, body {
-      background-color: #111113 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      border: none !important;
-      overflow: hidden !important;
-    }
-  </style>
   <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/js/marked.min.js"></script>
 </head>
-<body style="background-color: #111113; margin: 0; padding: 0; border: none;">
+<body>
 
-  <!-- 1. TOP WINDOW BAR (FRAMELESS & DRAGGABLE) -->
-  <header class="top-title-bar pywebview-drag-region">
+  <!-- 1. TOP WINDOW BAR -->
+  <header class="top-title-bar">
     <div class="window-nav">
       <div class="app-title-logo">
-        <!-- Uroboros Infinity Icon -->
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.267-8-12.356-8-5.096 0-5.096 8 0 8 5.09 0 7.261-8 12.356-8Z"/>
         </svg>
         <span>Uroboros</span>
       </div>
-      <nav class="window-menu">
-        <span>File</span>
-        <span>View</span>
-        <span>Window</span>
-      </nav>
-    </div>
-    <div class="window-center-title" id="windowCenterTitle">
-      Uroboros / DeepSeek API Automation With Selenium
-    </div>
-    <div class="window-controls">
-      <button class="win-ctrl-btn" id="btnWinMinimize" title="Свернуть">&#8212;</button>
-      <button class="win-ctrl-btn" id="btnWinMaximize" title="Развернуть">&#9633;</button>
-      <button class="win-ctrl-btn close" id="btnWinClose" title="Закрыть">&#10005;</button>
-    </div>
-  </header>
 
-  <!-- 2. MAIN 3-COLUMN APP CONTAINER -->
-  <div class="app-container">
-
-    <!-- LEFT SIDEBAR -->
-    <aside class="sidebar-left">
-      <div class="sidebar-header">
-        <button class="icon-btn" title="Toggle Sidebar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-        </button>
-        <button class="icon-btn" title="Back">&#8592;</button>
-        <button class="icon-btn" title="Forward">&#8594;</button>
-        <button class="icon-btn" title="Search">&#128269;</button>
+      <!-- ACTIVE PROJECT PILL -->
+      <div class="active-project-pill" id="topActiveProjectPill" style="display: none;">
+        <span class="pill-dot"></span>
+        <span id="topProjName">Проект</span>
       </div>
+    </div>
 
-      <button class="new-chat-btn" id="btnNewChat">
-        <span style="font-size: 16px; font-weight: 400;">+</span>
-        <span>New Conversation</span>
+    <!-- CENTER: WORKSPACE TABS -->
+    <div class="top-nav-tabs">
+      <button class="top-tab-btn active" id="tabBtnLeadChat" data-view="chat">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Чат с руководителем</span>
       </button>
 
-      <div class="sidebar-nav-links">
-        <div class="nav-link" id="navHistory">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Conversation History</span>
+      <button class="top-tab-btn" id="tabBtnMindMap" data-view="mindmap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="5" cy="6" r="2.5"/>
+          <circle cx="19" cy="6" r="2.5"/>
+          <circle cx="5" cy="18" r="2.5"/>
+          <circle cx="19" cy="18" r="2.5"/>
+          <line x1="7" y1="8" x2="10" y2="10.5"/>
+          <line x1="17" y1="8" x2="14" y2="10.5"/>
+          <line x1="7" y1="16" x2="10" y2="13.5"/>
+          <line x1="17" y1="16" x2="14" y2="13.5"/>
+        </svg>
+        <span>Интеллектуальная карта</span>
+      </button>
+    </div>
+
+    <!-- RIGHT: CLEAN TOP BAR -->
+    <div class="top-bar-right"></div>
+  </header>
+
+  <!-- 2. MAIN APP CONTAINER -->
+  <div class="app-container">
+
+    <!-- LEFT SIDEBAR: PROJECTS -->
+    <aside class="sidebar-left">
+      <div class="projects-sidebar-header">
+        <div class="sidebar-section-title">
+          <span>ПРОЕКТЫ</span>
+          <span id="projectCountBadge" class="count-badge">0</span>
         </div>
-        <div class="nav-link" id="navAutomations">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/></svg>
-          <span>Automations</span>
-        </div>
-        <div class="nav-link" id="navCustomizations">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Customizations</span>
-        </div>
+        <button class="new-project-btn" id="btnOpenNewProjectModal">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Создать проект</span>
+        </button>
       </div>
 
-      <!-- DYNAMIC CONVERSATIONS LIST (NO HARDCODED PROJECTS) -->
-      <div class="projects-section">
-        <div class="projects-header">
-          <span>Conversations</span>
-          <span id="chatCountBadge" style="font-size: 11px; color: var(--text-dim);">0</span>
-        </div>
-
-        <div id="conversationsList" class="conversations-list">
-          <!-- Populated dynamically via JS from scratch -->
-        </div>
+      <!-- DYNAMIC PROJECTS LIST (STARTS CLEAN) -->
+      <div id="projectsList" class="projects-list-container">
+        <!-- Rendered via JS -->
       </div>
 
-      <!-- SIDEBAR BOTTOM -->
+      <!-- SIDEBAR FOOTER -->
       <div class="sidebar-bottom">
-        <div class="settings-btn" id="btnOpenSettings">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Settings</span>
+        <div class="settings-btn" id="btnOpenSettings" title="Настройки системы">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Настройки</span>
         </div>
-        <span id="authStatusDot" class="status-indicator" title="Selenium & Token Status"></span>
+        <span id="authStatusDot" class="status-dot"></span>
       </div>
     </aside>
 
-    <!-- CENTER CHAT AREA -->
-    <main class="main-chat-container">
-      <!-- HEADER BREADCRUMB -->
-      <div class="chat-top-header">
-        <div class="chat-breadcrumb">
-          <span>Uroboros</span>
-          <span>/</span>
-          <strong id="activeChatTitle">New Conversation</strong>
-        </div>
-        <div class="chat-header-actions">
-          <button class="icon-btn" title="Share">&#128172;</button>
-          <button class="icon-btn" title="Options">&#8943;</button>
-          <button class="icon-btn" title="Toggle Layout">&#9707;</button>
-        </div>
-      </div>
+    <!-- CENTER WORKSPACE -->
+    <main class="main-workspace-container">
 
-      <!-- MESSAGES FEED -->
-      <div class="chat-messages-scroll" id="messagesContainer">
-        <div id="emptyFeedState" style="text-align: center; color: var(--text-dim); margin-top: 60px; font-size: 13.5px; line-height: 1.8;">
-          <div style="font-size: 24px; margin-bottom: 8px;">♾️</div>
-          <strong style="color: var(--text-main); font-size: 15px;">Uroboros DeepSeek API Client</strong><br>
-          Создавайте чаты с нуля, отправляйте запросы через requests и прикрепляйте файлы.<br>
-          <span style="font-size: 12px; color: var(--text-muted);">Настройте токен или войдите через Selenium в меню <strong>⚙ Settings</strong>.</span>
-        </div>
-      </div>
-
-      <!-- 3. FLOATING INPUT CONTAINER -->
-      <div class="chat-input-wrapper">
-        <!-- Attached files chips container -->
-        <div class="attached-files-chips" id="attachedChips"></div>
-
-        <textarea
-          class="chat-textarea"
-          id="chatPromptInput"
-          rows="1"
-          placeholder="Ask anything, @ to mention, / for actions"
-        ></textarea>
-
-        <div class="chat-input-toolbar">
-          <div class="toolbar-left">
-            <button class="toolbar-pill" id="btnAttachFile" title="Прикрепить файл">
-              <span style="font-size: 15px; font-weight: bold;">+</span>
-            </button>
-            <input type="file" id="hiddenFileInput" style="display: none;">
-
-            <!-- Model selector pill -->
-            <button class="toolbar-pill" id="btnModelSelect">
-              <span id="modelLabel">DeepSeek-V3</span>
-              <span style="font-size: 10px;">&#9662;</span>
-            </button>
+      <!-- ============================================================== -->
+      <!-- VIEW 1: LEAD AGENT CHAT                                        -->
+      <!-- ============================================================== -->
+      <section id="viewLeadChat" class="workspace-view active">
+        <!-- HEADER BREADCRUMB -->
+        <div class="chat-top-header">
+          <div class="chat-breadcrumb">
+            <span id="breadProjectName">Проект</span>
+            <span class="bread-sep">/</span>
+            <strong id="breadLeadName">Руководитель проекта</strong>
+            <span class="bread-sep">/</span>
+            <span class="project-folder-pill" id="breadProjectFolder" title="Рабочая папка проекта">📁 ...</span>
           </div>
 
-          <div class="toolbar-right">
-            <button class="toolbar-pill" id="btnTurbo">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <span>Turbo</span>
-              <span style="font-size: 10px;">&#9662;</span>
-            </button>
-
-            <button class="send-btn" id="btnSendMessage" title="Send message">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          <div class="chat-header-actions">
+            <span class="subagents-count-pill" id="leadSubagentsCount">0 субагентов</span>
+            <button class="icon-btn" id="btnGoToMindMap" title="Открыть карту агентов">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><line x1="7" y1="8" x2="10" y2="10.5"/><line x1="17" y1="8" x2="14" y2="10.5"/><line x1="7" y1="16" x2="10" y2="13.5"/><line x1="17" y1="16" x2="14" y2="13.5"/>
+              </svg>
             </button>
           </div>
         </div>
-      </div>
-    </main>
 
-    <!-- RIGHT PANEL -->
-    <aside class="sidebar-right">
-      <div class="right-tabs-header">
-        <div class="tab-btn active" data-tab="terminal">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          <span>Terminal</span>
-        </div>
-        <div class="tab-btn" data-tab="files">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-          <span>Files</span>
-        </div>
-        <div class="tab-btn" data-tab="review">Review</div>
-      </div>
-
-      <!-- TAB CONTENT -->
-      <div class="right-panel-content">
-        <!-- 1. TERMINAL / NETWORK LOGS TAB -->
-        <div id="tabContentTerminal" class="tab-pane active">
-          <div class="panel-card">
-            <div class="panel-card-title">
-              <span>Network Inspector</span>
-              <span id="logCountBadge" style="font-size: 11px; color: var(--text-dim);">Live</span>
-            </div>
-            <div class="logs-list" id="networkLogsList">
-              <!-- Logs injected here -->
-            </div>
+        <!-- AGENTS CHAT TABS BAR (Switch between Lead Agent and Subagents) -->
+        <div class="chat-agents-nav" id="chatAgentsNav">
+          <div class="chat-agents-pills-scroll" id="chatAgentsPills">
+            <button class="agent-chat-pill active" id="pillAgentLead" data-type="lead">
+              <span class="pill-icon">🧠</span>
+              <span class="pill-title" id="leadPillTitle">Руководитель</span>
+            </button>
           </div>
+          <button class="add-subagent-mini-btn" id="btnQuickAddSubagent" title="Назначить нового субагента">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Субагент</span>
+          </button>
         </div>
 
-        <!-- 2. FILES TAB -->
-        <div id="tabContentFiles" class="tab-pane" style="display: none;">
-          <div class="panel-card">
-            <div class="panel-card-title">
-              <span>Uploaded Files</span>
-            </div>
-            <div id="uploadedFilesList" style="display: flex; flex-direction: column; gap: 8px;">
-              <span style="color: var(--text-dim); font-size: 12px;">Файлы пока не загружены. Нажмите '+' в поле ввода.</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. REVIEW TAB -->
-        <div id="tabContentReview" class="tab-pane" style="display: none;">
-          <div class="panel-card">
-            <div class="panel-card-title"><span>System Overview</span></div>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-              Uroboros работает на чистых HTTP-реквестах с автоматическим Proof-of-Work WASM-солвером.
+        <!-- MESSAGES FEED -->
+        <div class="chat-messages-scroll" id="messagesContainer">
+          <div id="emptyFeedState" class="empty-feed-card">
+            <div class="empty-title">Чат с Руководителем проекта</div>
+            <p class="empty-subtitle">
+              Выберите проект слева или создайте новый, чтобы начать общение и координацию субагентов.
             </p>
           </div>
         </div>
+
+        <!-- INPUT CONTAINER (PINNED AT BOTTOM IN NORMAL FLOW, NO OVERLAP) -->
+        <div class="chat-input-bottom-panel">
+          <div class="chat-input-wrapper" id="chatInputWrapper">
+            <div class="chat-drag-overlay" id="chatDragOverlay" style="display: none;">
+              <div class="chat-drag-overlay-icon">📥</div>
+              <div class="chat-drag-overlay-text">Перетащите файлы сюда для прикрепления</div>
+            </div>
+
+            <div class="attached-files-chips" id="attachedChips"></div>
+
+            <textarea
+              class="chat-textarea"
+              id="chatPromptInput"
+              rows="1"
+              placeholder="Дайте задачу или инструкцию Руководителю проекта..."
+            ></textarea>
+
+            <div class="chat-input-toolbar">
+              <div class="toolbar-left">
+                <button class="toolbar-pill" id="btnAttachFile" title="Прикрепить файл">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  <span>Файл</span>
+                </button>
+                <input type="file" id="hiddenFileInput" multiple style="display: none;">
+
+                <button class="toolbar-pill" id="btnModelSelect">
+                  <span id="modelLabel">DeepSeek-V3</span>
+                  <span style="font-size: 9px; opacity: 0.6;">&#9662;</span>
+                </button>
+
+                <button class="toolbar-pill" id="btnToggleReasoning" title="Включить / отключить режим рассуждений R1">
+                  <span id="reasoningStatusLabel">DeepThink: Выкл</span>
+                </button>
+              </div>
+
+              <div class="toolbar-right">
+                <button class="send-btn" id="btnSendMessage" title="Отправить сообщение">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- VIEW 2: ANIMATED AGENT MIND MAP                                -->
+      <!-- ============================================================== -->
+      <section id="viewMindMap" class="workspace-view" style="display: none;">
+        <div class="mindmap-top-header">
+          <div class="mindmap-title-block">
+            <h2 id="mindmapProjectTitle">Интеллектуальная карта агентов</h2>
+            <span class="mindmap-subtitle" id="mindmapStats">0 субагентов</span>
+          </div>
+
+          <div class="mindmap-actions">
+            <button class="btn-primary-action" id="btnOpenAddAgentModal">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Назначить субагента</span>
+            </button>
+            <button class="btn-secondary-action" id="btnRefreshMindMap" title="Обновить карту">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="mindmap-canvas-container" id="mindMapCanvasContainer">
+          <svg class="mindmap-svg-layer" id="mindMapSvgLayer"></svg>
+          <div class="mindmap-nodes-layer" id="mindMapNodesLayer"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- RIGHT PANEL: AGENTS / TERMINAL / FILES -->
+    <aside class="sidebar-right">
+      <div class="right-tabs-header">
+        <div class="tab-btn active" data-tab="agents" id="tabBtnAgents">
+          <span>Субагенты</span>
+          <span class="tab-pulse-badge" id="tabAgentsPulseBadge" style="display: none;">●</span>
+        </div>
+        <div class="tab-btn" data-tab="terminal">
+          <span>Терминал</span>
+        </div>
+        <div class="tab-btn" data-tab="files">
+          <span>Файлы</span>
+        </div>
       </div>
 
-      <!-- RIGHT PANEL FOOTER -->
-      <div class="right-panel-footer">
-        <span>Background Tasks</span>
-        <span style="font-weight: 600; color: var(--text-main);">Active</span>
+      <div class="right-panel-content">
+        <!-- 1. AGENTS & LIVE ACTIVITY TAB -->
+        <div id="tabContentAgents" class="tab-pane active" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- LIVE ACTIVITY / STATUS MONITOR CARD -->
+          <div class="panel-card live-activity-panel" id="liveActivityPanel">
+            <div class="panel-card-title">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="live-activity-pulse-dot" id="liveActivityPulse"></span>
+                <span>Текущая активность</span>
+              </div>
+              <span id="liveActivityStatusBadge" class="activity-badge idle">Ожидание</span>
+            </div>
+            <div class="live-activity-body" id="liveActivityBody">
+              <div class="live-activity-hero">
+                <div class="hero-agent-icon" id="liveHeroAgentIcon">🧠</div>
+                <div class="hero-agent-info">
+                  <div class="hero-agent-name" id="liveHeroAgentName">Готов к работе</div>
+                  <div class="hero-agent-action" id="liveHeroAgentAction">Ожидает поручения или вопроса в чате</div>
+                </div>
+              </div>
+              <div class="live-activity-timer-row" id="liveActivityTimerRow" style="display: none;">
+                <span class="timer-label">В работе:</span>
+                <span class="timer-value" id="liveActivityTimer">00:00</span>
+                <button class="btn-stop-activity" id="btnStopLiveActivity" title="Остановить выполнение">⏹ Стоп</button>
+              </div>
+              <!-- MINI STEPS FEED -->
+              <div class="live-steps-mini-feed" id="liveActivityStepsFeed" style="display: none;"></div>
+            </div>
+          </div>
+
+          <!-- TEAM AGENTS & STATUS LIST -->
+          <div class="panel-card">
+            <div class="panel-card-title">
+              <span>Команда проекта</span>
+              <span id="rightAgentsBadge" class="count-badge">0</span>
+            </div>
+            <div id="rightSubagentsList" class="subagents-list-feed"></div>
+          </div>
+        </div>
+
+        <!-- 2. TERMINAL TAB -->
+        <div id="tabContentTerminal" class="tab-pane" style="display: none;">
+          <div class="panel-card" style="display: flex; flex-direction: column; height: 100%; min-height: 480px;">
+            <div class="panel-card-title">
+              <span>Терминал & Консоль</span>
+              <button class="terminal-clear-btn" id="btnClearTerminal" title="Очистить консоль">&#10005; Очистить</button>
+            </div>
+
+            <!-- TERMINAL LOG WINDOW -->
+            <div class="terminal-window" id="terminalLogWindow">
+              <div class="terminal-line system">[Система] Консоль PowerShell Uroboros активна. Координатор и субагенты могут выполнять системные команды через [CMD: команда].</div>
+            </div>
+
+            <!-- INTERACTIVE COMMAND LINE BAR -->
+            <div class="terminal-input-bar">
+              <span class="terminal-prompt-prefix">$</span>
+              <input type="text" id="terminalCmdInput" class="terminal-cmd-input" placeholder="Введите команду (например: dir, git status, pip list)...">
+              <button id="btnExecuteTerminalCmd" class="terminal-run-btn">Запуск</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. FILES TAB -->
+        <div id="tabContentFiles" class="tab-pane" style="display: none;">
+          <div class="panel-card">
+            <div class="panel-card-title">
+              <span>Файлы проекта</span>
+            </div>
+            <div class="files-list" id="uploadedFilesList">
+              <div class="empty-hint">Файлы пока не загружены.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
 
   </div>
 
-  <!-- 3. SETTINGS MODAL (TOKEN & AUTH SETTINGS) -->
-  <div class="modal-overlay" id="settingsModal" style="display: none;">
-    <div class="modal-card">
+  <!-- MODAL: СОЗДАНИЕ ПРОЕКТА -->
+  <div class="modal-backdrop" id="modalNewProject" style="display: none;">
+    <div class="modal-window">
       <div class="modal-header">
-        <div class="modal-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Настройки / DeepSeek Token Settings</span>
-        </div>
-        <button class="icon-btn" id="btnCloseSettings">&#10005;</button>
+        <span class="modal-title">Создать проект</span>
+        <button class="modal-close-btn" id="btnCloseNewProjectModal">&#10005;</button>
       </div>
-
       <div class="modal-body">
-        <!-- Token Section -->
-        <div class="settings-section">
-          <label class="settings-label">DeepSeek Authorization Token (Bearer)</label>
-          <div class="settings-input-row">
-            <input type="password" id="settingTokenInput" class="settings-input" placeholder="Введите или вставьте токен вручную...">
-            <button class="action-btn-secondary" id="btnToggleTokenVisibility" title="Показать/скрыть токен" style="padding: 7px 10px;">👁</button>
-          </div>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 5px;">
-            Токен авторизации для выполнения запросов через requests.
-          </div>
+        <div class="modal-field">
+          <label class="modal-label">Название проекта</label>
+          <input type="text" class="modal-input" id="newProjectNameInput" placeholder="Например: Парсинг данных или Разработка API">
         </div>
-
-        <!-- Selenium Auto-login Section -->
-        <div class="settings-section" style="margin-top: 16px;">
-          <label class="settings-label">Автоматический вход через Selenium</label>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
-            Запустит настоящий Chrome на <code>chat.deepseek.com</code> без признаков автоматизации. Капча решается как в обычном браузере.
-          </p>
-          <div style="display: flex; gap: 8px;">
-            <button class="action-btn-primary" id="btnSettingsLaunchSelenium">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <span>Войти через Chrome</span>
-            </button>
-            <button class="action-btn-secondary" id="btnResetBrowserProfile" title="Сбросить временный кэш и историю неудачных попыток капчи">
-              Сбросить кэш капчи
+        <div class="modal-field">
+          <label class="modal-label">Рабочая папка проекта (Workspace Root)</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input
+              type="text"
+              class="modal-input"
+              id="newProjectFolderInput"
+              placeholder="Например: D:\Coding\MyProject"
+              style="flex: 1;"
+            >
+            <button type="button" class="modal-btn secondary" id="btnBrowseProjectFolder" style="white-space: nowrap; padding: 0 12px; height: 34px; font-size: 11.5px;">
+              📁 Обзор...
             </button>
           </div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+            Основная папка репозитория. Все команды субагентов будут выполняться в ней.
+          </div>
         </div>
-
-        <!-- Session Info Section -->
-        <div class="settings-section" style="margin-top: 16px;">
-          <label class="settings-label">Информация о текущей сессии</label>
-          <div class="session-info-card">
-            <div>Статус авторизации: <strong id="settingsAuthStatusText" style="color: var(--accent-green);">Active</strong></div>
-            <div>Сохранено cookies: <strong id="settingsCookieCount">0</strong></div>
-            <div>Время сохранения: <span id="settingsSavedAt">-</span></div>
+        <div class="modal-field">
+          <label class="modal-label">Режим работы проекта</label>
+          <div class="project-mode-cards">
+            <label class="project-mode-card active" id="modeCardMulti">
+              <input type="radio" name="newProjectMode" value="multi" checked style="display: none;">
+              <div class="mode-card-header">
+                <span class="mode-card-icon">🧠</span>
+                <span class="mode-card-title">1. Супер-агент с дополнительными агентами</span>
+              </div>
+              <div class="mode-card-desc">Руководитель проекта координирует задачи, распределяет работу профильным субагентам, проводит аудит и собирает результат.</div>
+            </label>
+            <label class="project-mode-card" id="modeCardSolo">
+              <input type="radio" name="newProjectMode" value="solo" style="display: none;">
+              <div class="mode-card-header">
+                <span class="mode-card-icon">⚡</span>
+                <span class="mode-card-title">2. Один агент (всё делает самостоятельно)</span>
+              </div>
+              <div class="mode-card-desc">Единый автономный инженер решает задачу целиком самостоятельно: напрямую пишет весь код, создаёт файлы и запускает команды без субагентов.</div>
+            </label>
           </div>
         </div>
       </div>
-
       <div class="modal-footer">
-        <button class="action-btn-secondary" id="btnClearSession" style="color: var(--accent-red); border-color: rgba(239,68,68,0.3);">Очистить сессию</button>
-        <div style="display: flex; gap: 8px;">
-          <button class="action-btn-secondary" id="btnCancelSettings">Отмена</button>
-          <button class="action-btn-primary" id="btnSaveToken">Сохранить токен</button>
+        <button class="modal-btn secondary" id="btnCancelNewProject">Отмена</button>
+        <button class="modal-btn primary" id="btnSubmitNewProject">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ДОБАВЛЕНИЕ СУБАГЕНТА -->
+  <div class="modal-backdrop" id="modalNewAgent" style="display: none;">
+    <div class="modal-window">
+      <div class="modal-header">
+        <span class="modal-title">Назначить субагента</span>
+        <button class="modal-close-btn" id="btnCloseNewAgentModal">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Имя субагента</label>
+          <input type="text" class="modal-input" id="newAgentNameInput" placeholder="Например: Исследователь API">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Роль / Специализация</label>
+          <input type="text" class="modal-input" id="newAgentRoleInput" placeholder="Например: Анализ сетевых пакетов и проверка PoW">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Иконка агента</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" class="modal-input" id="newAgentIconInput" value="🤖" style="width: 50px; text-align: center; font-size: 16px;">
+            <div class="agent-emoji-presets" style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <button type="button" class="emoji-preset-btn">⚡</button>
+              <button type="button" class="emoji-preset-btn">🕷️</button>
+              <button type="button" class="emoji-preset-btn">💻</button>
+              <button type="button" class="emoji-preset-btn">🔍</button>
+              <button type="button" class="emoji-preset-btn">🛡️</button>
+              <button type="button" class="emoji-preset-btn">📊</button>
+              <button type="button" class="emoji-preset-btn">🎨</button>
+              <button type="button" class="emoji-preset-btn">🚀</button>
+              <button type="button" class="emoji-preset-btn">🤖</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Системный промпт (инструкция роли)</label>
+          <textarea class="modal-input" id="newAgentPromptInput" rows="3" placeholder="Инструкция для агента при выполнении задач..."></textarea>
         </div>
       </div>
+      <div class="modal-footer">
+        <button class="modal-btn secondary" id="btnCancelNewAgent">Отмена</button>
+        <button class="modal-btn primary" id="btnSubmitNewAgent">Назначить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: НАСТРОЙКИ (СТИЛЬ CURSOR / ANTIGRAVITY НА РУССКОМ) -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;">
+    <div class="settings-dialog">
+      <!-- LEFT SETTINGS NAV -->
+      <aside class="settings-sidebar">
+        <div>
+          <div class="settings-nav-section-title">Настройки</div>
+          <div class="settings-nav-items">
+            <div class="settings-nav-item active" data-tab="general">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>Общие</span>
+            </div>
+            <div class="settings-nav-item" data-tab="session">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Сессия и токен</span>
+            </div>
+            <div class="settings-nav-item" data-tab="appearance">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+              <span>Внешний вид</span>
+            </div>
+            <div class="settings-nav-item" data-tab="models">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              <span>Модели и мышление</span>
+            </div>
+            <div class="settings-nav-item" data-tab="permissions">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>Терминал и команды</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-sidebar-bottom">
+          <div class="settings-nav-sublink" id="btnShortcutsInfo" title="Горячие клавиши">Горячие клавиши</div>
+          <div class="settings-user-badge">
+            <div class="settings-user-avatar">DS</div>
+            <div class="settings-user-details">
+              <div class="settings-user-name" id="settingAuthTextNav">DeepSeek Web</div>
+              <div class="settings-user-sub" id="settingAuthSubtextNav">Reverse API Studio</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT SETTINGS CONTENT -->
+      <main class="settings-content-wrap">
+        <button class="settings-close-btn" id="btnCloseSettings" title="Закрыть (Esc)">&times;</button>
+
+        <div class="settings-pane-scroll">
+          <!-- 1. TAB: GENERAL (ОБЩИЕ) -->
+          <div class="settings-tab-pane" id="paneGeneral">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Общие настройки</h2>
+              <div class="settings-pane-desc">Управление исполнением задач, поведением агентов и системными политиками.</div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Параметры выполнения</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Очередь сообщений</div>
+                  <div class="settings-card-hint">Настройка момента отправки сообщений при непрерывной генерации.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="queuedMsgSegmented">
+                    <button class="settings-segmented-btn active" data-val="queue">В очередь</button>
+                    <button class="settings-segmented-btn" data-val="immediate">Сразу отправлять</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Глобальные права</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Профиль безопасности</div>
+                  <div class="settings-card-hint">Контроль уровня автономности и допустимых действий агента.</div>
+                </div>
+                <div class="settings-card-control">
+                  <select class="settings-select" id="securityPresetSelect">
+                    <option value="turbo" selected>Турбо-режим (Turbo)</option>
+                    <option value="strict">Строгий режим (Strict)</option>
+                    <option value="safe">Безопасный (Safe)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Инструменты и доступ</div>
+                  <div class="settings-card-hint">Настройка прав для файлов, терминала и вызова консольных команд.</div>
+                </div>
+                <div class="settings-card-control">
+                  <button class="settings-action-btn" id="btnToolPermissions">Открыть</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Поведение координатора</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Подтверждение плана</div>
+                  <div class="settings-card-hint">Запрашивать ли подтверждение пользователя перед созданием задач.</div>
+                </div>
+                <div class="settings-card-control">
+                  <select class="settings-select" id="planReviewSelect">
+                    <option value="always" selected>Всегда спрашивать</option>
+                    <option value="auto">Авто-подтверждение</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Сетевой транспорт</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Реверс-протокол DeepSeek</div>
+                  <div class="settings-card-hint">Прямые HTTP-запросы + локальный WebAssembly PoW солвер (без официального API ключа).</div>
+                </div>
+                <div class="settings-card-control">
+                  <span class="settings-badge"><span class="status-dot online"></span>Активен (Wasmtime)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. TAB: SESSION & AUTH (СЕССИЯ И АВТОРИЗАЦИЯ) -->
+          <div class="settings-tab-pane" id="paneSession" style="display: none;">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Сессия и авторизация</h2>
+              <div class="settings-pane-desc">Токен сессии DeepSeek Web, куки авторизации и запуск скрытого браузера Chrome.</div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Статус подключения</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Сессия chat.deepseek.com</div>
+                  <div class="settings-card-hint" id="settingAuthSubtext">Куки и токены сессии</div>
+                </div>
+                <div class="settings-card-control">
+                  <span class="settings-badge" id="settingAuthBadge">
+                    <span class="status-dot" id="settingAuthIndicator"></span>
+                    <span id="settingAuthText">Проверка...</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Токен сессии</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Токен пользователя (dUr4...)</div>
+                  <div class="settings-card-hint">Заголовок Authorization Bearer для выполнения запросов к DeepSeek.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-token-wrap">
+                    <input type="password" id="settingTokenInput" class="settings-token-input" placeholder="Токен сессии DeepSeek">
+                    <button class="settings-action-btn" id="btnToggleTokenVisibility" title="Показать / скрыть">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button class="settings-action-btn primary" id="btnSaveToken">Сохранить</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Вход через Chrome (Stealth)</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Авторизация через браузер Chrome</div>
+                  <div class="settings-card-hint">Запуск браузера с максимальной маскировкой от детекта Cloudflare и выделенным профилем.</div>
+                </div>
+                <div class="settings-card-control">
+                  <button class="settings-action-btn" id="btnSettingsLaunchSelenium">Войти через Chrome</button>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Сброс профиля и кэша капчи</div>
+                  <div class="settings-card-hint">Очистить кэш Selenium при повторных ошибках решения Cloudflare капчи.</div>
+                </div>
+                <div class="settings-card-control">
+                  <button class="settings-action-btn" id="btnSettingsResetProfile">Сбросить кэш</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Сброс данных</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Очистка сессии</div>
+                  <div class="settings-card-hint">Удалить сохраненные cookie и токен авторизации из data/session.json.</div>
+                </div>
+                <div class="settings-card-control">
+                  <button class="settings-action-btn danger" id="btnClearSession">Очистить сессию</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. TAB: APPEARANCE (ВНЕШНИЙ ВИД) -->
+          <div class="settings-tab-pane" id="paneAppearance" style="display: none;">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Внешний вид</h2>
+              <div class="settings-pane-desc">Настройка цветовой темы, шрифтов и плотности интерфейса Uroboros.</div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Цветовая тема</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Интерфейсная тема</div>
+                  <div class="settings-card-hint">Переключение между строгой тёмной и чистой светлой темой с адаптацией системного заголовка Windows.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="themeSegmented">
+                    <button class="settings-segmented-btn active" data-theme="dark">Тёмная (Dark)</button>
+                    <button class="settings-segmented-btn" data-theme="light">Светлая (Light)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Типографика и плотность</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Шрифт кода</div>
+                  <div class="settings-card-hint">Моноширинный шрифт для блоков кода и терминала.</div>
+                </div>
+                <div class="settings-card-control">
+                  <select class="settings-select" id="codeFontSelect">
+                    <option value="fira" selected>Fira Code</option>
+                    <option value="jetbrains">JetBrains Mono</option>
+                    <option value="consolas">Consolas</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Плотность интерфейса</div>
+                  <div class="settings-card-hint">Компактность отступов списков и карточек.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="densitySegmented">
+                    <button class="settings-segmented-btn active" data-density="normal">Стандартная</button>
+                    <button class="settings-segmented-btn" data-density="compact">Компактная</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. TAB: MODELS (МОДЕЛИ) -->
+          <div class="settings-tab-pane" id="paneModels" style="display: none;">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Модели и мышление</h2>
+              <div class="settings-pane-desc">Настройка языковых моделей DeepSeek, глубины мышления и PoW вычислений.</div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Выбор модели</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Модель по умолчанию</div>
+                  <div class="settings-card-hint">Основная модель DeepSeek для координатора и субагентов.</div>
+                </div>
+                <div class="settings-card-control">
+                  <select class="settings-select" id="defaultModelSelect">
+                    <option value="deepseek-chat" selected>deepseek-chat (V3)</option>
+                    <option value="deepseek-reasoner">deepseek-reasoner (R1)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Цепочка рассуждений (Thinking)</div>
+                  <div class="settings-card-hint">Отображение блока мыслей модели R1 перед финальным ответом.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="thinkingSegmented">
+                    <button class="settings-segmented-btn active" data-val="show">Показывать</button>
+                    <button class="settings-segmented-btn" data-val="collapse">Сворачивать</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Криптографический PoW движок</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">WASM DeepSeekHashV1 Солвер</div>
+                  <div class="settings-card-hint">Локальный расчет PoW хэшей для быстрого обхода защиты DeepSeek.</div>
+                </div>
+                <div class="settings-card-control">
+                  <span class="settings-badge"><span class="status-dot online"></span>Wasmtime Активен</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. TAB: PERMISSIONS & TERMINAL (ТЕРМИНАЛ И ПРАВА) -->
+          <div class="settings-tab-pane" id="panePermissions" style="display: none;">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Терминал и командная строка</h2>
+              <div class="settings-pane-desc">Управление правами координатора и субагентов на исполнение команд в терминале.</div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-heading">Исполнение команд и задач</div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Команды в терминале (PowerShell / Shell)</div>
+                  <div class="settings-card-hint">Разрешить координатору и субагентам выполнять консольные команды в рабочей директории.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="terminalCmdSegmented">
+                    <button class="settings-segmented-btn active" data-val="enabled">Разрешено</button>
+                    <button class="settings-segmented-btn" data-val="confirm">С подтверждением</button>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Автономное выполнение задач</div>
+                  <div class="settings-card-hint">Автоматический запуск субагентов при распределении задач координатором.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="autoExecSegmented">
+                    <button class="settings-segmented-btn active" data-val="auto">Автономно</button>
+                    <button class="settings-segmented-btn" data-val="manual">По клику</button>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-row-card">
+                <div class="settings-card-text">
+                  <div class="settings-card-label">Логирование в инспектор терминала</div>
+                  <div class="settings-card-hint">Вывод полного вывода команд и сетевых фрагментов в панель «Терминал» справа.</div>
+                </div>
+                <div class="settings-card-control">
+                  <div class="settings-segmented" id="inspectorSegmented">
+                    <button class="settings-segmented-btn active" data-val="on">Включено</button>
+                    <button class="settings-segmented-btn" data-val="off">Выключено</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
     </div>
   </div>
 

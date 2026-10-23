@@ -40,8 +40,14 @@ class PowSolver:
             )
 
             solution = solver.solve(challenge_obj)
-            payload = solution.to_answer_payload()
-            payload["target_path"] = target_path
+            payload = {
+                "algorithm": algorithm,
+                "challenge": challenge_data["challenge"],
+                "salt": challenge_data["salt"],
+                "answer": int(solution.answer),
+                "signature": challenge_data.get("signature"),
+                "target_path": target_path,
+            }
 
             raw_json = json.dumps(payload, separators=(',', ':'))
             encoded = base64.b64encode(raw_json.encode('utf-8')).decode('utf-8')
