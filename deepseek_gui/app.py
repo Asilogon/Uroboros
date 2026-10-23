@@ -141,7 +141,7 @@ def api_start_selenium():
     global browser_instance, browser_thread
 
     if browser_thread and browser_thread.is_alive():
-        return jsonify({"status": "running", "message": "Браузер уже запущен и ожидает входа."})
+        return jsonify({"status": "running", "message": "Браузер уже запущен. Вы можете работать в нем."})
 
     def run_browser():
         global browser_instance
@@ -149,7 +149,8 @@ def api_start_selenium():
             browser_instance = DeepSeekBrowser(headless=False)
             browser_instance.open_deepseek()
             browser_instance.start_traffic_monitor(print_traffic=False)
-            browser_instance.wait_for_user_login(timeout_seconds=600, interactive=False)
+            # Waits until user explicitly closes the Chrome browser window!
+            browser_instance.wait_until_closed_by_user()
         finally:
             if browser_instance:
                 browser_instance.close()
@@ -160,7 +161,7 @@ def api_start_selenium():
 
     return jsonify({
         "status": "started",
-        "message": "Браузер Chrome успешно открыт. Войдите в DeepSeek в окне браузера.",
+        "message": "Браузер Chrome открыт. Выполните вход. Окно НЕ закроется автоматически — работайте в нем столько, сколько потребуется, и закройте крестиком, когда закончите.",
     })
 
 

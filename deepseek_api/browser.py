@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import WebDriverException, NoSuchWindowException
 
 from .logger import TrafficLogger, default_logger
 
@@ -19,7 +19,10 @@ INTERCEPTOR_PATH = Path(__file__).resolve().parent / "interceptor.js"
 
 
 class DeepSeekBrowser:
-    """Controls Chrome via Selenium to authenticate, intercept traffic, and save sessions."""
+    """
+    Controls Chrome via Selenium for chat.deepseek.com.
+    Logs network traffic, extracts cookies/tokens, and executes web actions directly in the browser.
+    """
 
     def __init__(
         self,
@@ -34,6 +37,7 @@ class DeepSeekBrowser:
         self._monitoring_stop_event = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self.captured_auth: Dict[str, Any] = {}
+        self.last_saved_session: Optional[Dict[str, Any]] = None
 
     def start(self) -> webdriver.Chrome:
         """Launches Chrome with anti-detection and network interceptor injected."""
@@ -51,7 +55,7 @@ class DeepSeekBrowser:
         options.add_argument("--no-service-autorun")
         options.add_argument("--password-store=basic")
         options.add_argument("--lang=ru,en-US,en")
-        options.add_argument("--window-size=1280,900")
+        options.add_argument("--window-size=1300,920")
 
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
@@ -112,7 +116,6 @@ class DeepSeekBrowser:
 
                 if logs:
                     for entry in logs:
-                        # Check if auth token is captured
                         self.logger.log(entry, print_to_console=print_traffic)
 
                 # 2. Check captured auth object from browser
@@ -125,7 +128,7 @@ class DeepSeekBrowser:
                     self.captured_auth.update(auth)
 
             except Exception:
-                # Browser might be navigating or closing
+                # Browser might be busy, navigating or closing
                 pass
 
             time.sleep(1.0)
@@ -153,14 +156,11 @@ class DeepSeekBrowser:
         if not self.driver:
             return False
         try:
-            # Check localStorage for userToken
             token = self.driver.execute_script(
                 """
                 try {
                     const ut = localStorage.getItem('userToken');
                     if (ut) return ut;
-                    const ds = localStorage.getItem('ds_token');
-                    if (ds) return ds;
                     for (let i = 0; i < localStorage.length; i++) {
                         const key = localStorage.key(i);
                         if (key && key.toLowerCase().includes('token')) {
@@ -174,11 +174,9 @@ class DeepSeekBrowser:
             if token:
                 return True
 
-            # Check if captured auth token exists
             if self.captured_auth.get("token"):
                 return True
 
-            # Check cookies
             cookies = self.driver.get_cookies()
             cookie_names = [c.get("name", "") for c in cookies]
             if "ds_session_id" in cookie_names or "userToken" in cookie_names:
@@ -193,7 +191,6 @@ class DeepSeekBrowser:
         if not self.driver:
             return None
         try:
-            # Check localStorage
             token_raw = self.driver.execute_script(
                 """
                 try {
@@ -220,91 +217,85 @@ class DeepSeekBrowser:
         except Exception:
             return None
 
-    def save_session(self, path: Optional[Path] = None) -> Dict[str, Any]:
+    def save_session(self, path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
         """Extracts cookies, tokens, localStorage, user-agent and saves to JSON."""
         target_path = Path(path) if path else SESSION_FILE
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not self.driver:
-            raise RuntimeError("Browser is not running.")
+            return self.last_saved_session
 
-        cookies = self.driver.get_cookies()
-        user_agent = self.driver.execute_script("return navigator.userAgent;")
-        local_storage = self.driver.execute_script(
-            "try { return {...localStorage}; } catch(e) { return {}; }"
-        )
-        session_storage = self.driver.execute_script(
-            "try { return {...sessionStorage}; } catch(e) { return {}; }"
-        )
-        token = self.get_token()
+        try:
+            cookies = self.driver.get_cookies()
+            user_agent = self.driver.execute_script("return navigator.userAgent;")
+            local_storage = self.driver.execute_script(
+                "try { return {...localStorage}; } catch(e) { return {}; }"
+            )
+            session_storage = self.driver.execute_script(
+                "try { return {...sessionStorage}; } catch(e) { return {}; }"
+            )
+            token = self.get_token()
 
-        session_data = {
-            "token": token,
-            "user_agent": user_agent,
-            "cookies": cookies,
-            "local_storage": local_storage,
-            "session_storage": session_storage,
-            "captured_headers": self.captured_auth,
-            "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        }
+            session_data = {
+                "token": token,
+                "user_agent": user_agent,
+                "cookies": cookies,
+                "local_storage": local_storage,
+                "session_storage": session_storage,
+                "captured_headers": self.captured_auth,
+                "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
 
-        with open(target_path, "w", encoding="utf-8") as f:
-            json.dump(session_data, f, indent=2, ensure_ascii=False)
+            with open(target_path, "w", encoding="utf-8") as f:
+                json.dump(session_data, f, indent=2, ensure_ascii=False)
 
-        print(f"[Browser] Session successfully saved to {target_path}")
-        print(f"[Browser] Token found: {'YES (' + token[:10] + '...)' if token else 'NO (relying on cookies)'}")
-        print(f"[Browser] Cookies saved: {len(cookies)}")
-        return session_data
+            self.last_saved_session = session_data
+            return session_data
+        except Exception as e:
+            print(f"[Browser] Error saving session: {e}")
+            return self.last_saved_session
 
-    def wait_for_user_login(
-        self,
-        timeout_seconds: int = 300,
-        interactive: bool = True,
-    ) -> bool:
+    def wait_until_closed_by_user(self):
         """
-        Waits until the user completes login in the browser.
-        Can auto-detect or wait for user to press Enter.
+        Keeps the browser open and continuously captures cookies and tokens.
+        Does NOT close the browser automatically!
+        Waits until the user manually closes the Chrome browser window.
         """
-        print("\n" + "=" * 60)
-        print(">>> ОЖИДАНИЕ АВТОРИЗАЦИИ В DEEPSEEK <<<")
-        print("Пожалуйста, войдите в свой аккаунт в открывшемся окне Chrome.")
-        print("Как только вы войдете, сессия и куки будут автоматически сохранены.")
-        if interactive:
-            print("Либо нажмите ENTER в этой консоли, если вы уже вошли.")
-        print("=" * 60 + "\n")
+        print("\n" + "=" * 65)
+        print(">>> БРАУЗЕР ОТКРЫТ ДЛЯ РАБОТЫ / АВТОРИЗАЦИИ <<<")
+        print("Пожалуйста, выполните вход в открывшемся окне Chrome.")
+        print("Окно НЕ закроется само — вы можете работать в нем столько, сколько нужно.")
+        print("Когда вы решите завершить — просто закройте окно браузера (крестиком).")
+        print("Все куки, токены и сессия будут сохранены автоматически.")
+        print("=" * 65 + "\n")
 
-        start_time = time.time()
-        stop_wait = threading.Event()
-
-        def user_input_thread():
-            if interactive:
-                try:
-                    input("Нажмите ENTER после успешного входа: ")
-                    stop_wait.set()
-                except Exception:
-                    pass
-
-        t = threading.Thread(target=user_input_thread, daemon=True)
-        t.start()
-
-        while time.time() - start_time < timeout_seconds:
-            if stop_wait.is_set():
-                print("[Browser] Пользователь подтвердил вход.")
-                break
-
-            if self.is_logged_in():
-                token = self.get_token()
-                if token:
-                    print("[Browser] Вход обнаружен автоматически (найден токен авторизации)!")
-                    # Give it a moment to finish any follow-up requests/cookies
-                    time.sleep(2)
+        while True:
+            try:
+                if not self.driver:
                     break
 
-            time.sleep(1.5)
+                # Check if window is still open
+                handles = self.driver.window_handles
+                if not handles or len(handles) == 0:
+                    print("[Browser] Все окна Chrome закрыты пользователем.")
+                    break
 
-        # Save session
-        self.save_session()
-        return True
+                # Periodically save intermediate session so data is constantly up-to-date
+                self.save_session()
+                time.sleep(2.0)
+
+            except (WebDriverException, NoSuchWindowException):
+                # Window was closed by user
+                print("[Browser] Обнаружено закрытие окна Chrome пользователем.")
+                break
+            except Exception as e:
+                # Any other exit
+                time.sleep(1.0)
+
+        # Cleanup monitor and driver
+        self.stop_traffic_monitor()
+        self.driver = None
+        print("[Browser] Сессия завершена. Все куки и токены сохранены в data/session.json.")
 
     def close(self):
         """Stops monitor and closes Chrome."""

@@ -32,12 +32,12 @@ def print_banner():
 
 
 def action_login():
-    print("\n--- Запуск браузера для авторизации ---")
+    print("\n--- Запуск браузера для работы / авторизации ---")
     browser = DeepSeekBrowser(headless=False)
     try:
         browser.open_deepseek()
         browser.start_traffic_monitor(print_traffic=True)
-        browser.wait_for_user_login(timeout_seconds=600, interactive=True)
+        browser.wait_until_closed_by_user()
         print("\n[OK] Сессия успешно сохранена в data/session.json!")
     finally:
         browser.close()
