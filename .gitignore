@@ -10,7 +10,9 @@ env/
 
 # DeepSeek session data & profile
 data/session.json
+data/chats.json
 data/chrome_profile/
+data/driver/
 logs/traffic.log
 logs/requests.jsonl
 logs/files/*

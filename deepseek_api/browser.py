@@ -8,9 +8,11 @@ from typing import Any, Dict, List, Optional
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException, NoSuchWindowException
 
 from .logger import TrafficLogger, default_logger
+from .stealth import get_patched_chromedriver, apply_stealth_to_driver
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SESSION_FILE = DATA_DIR / "session.json"
@@ -52,31 +54,32 @@ class DeepSeekBrowser:
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--disable-infobars")
         options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--disable-popup-blocking")
         options.add_argument("--no-service-autorun")
         options.add_argument("--password-store=basic")
         options.add_argument("--lang=ru,en-US,en")
-        options.add_argument("--window-size=1300,920")
+        options.add_argument("--window-size=1360,920")
+        options.add_argument("--disable-features=IsolateOrigins,site-per-process,UserAgentClientHint")
 
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         options.add_experimental_option("useAutomationExtension", False)
 
         # Logging prefs
         options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
 
-        print("[Browser] Launching Chrome...")
-        self.driver = webdriver.Chrome(options=options)
+        # Get stealth patched chromedriver (neutralized cdc_ signatures)
+        patched_driver = get_patched_chromedriver()
+        service = Service(executable_path=str(patched_driver)) if patched_driver else None
 
-        # CDP: remove navigator.webdriver flag
-        self.driver.execute_cdp_cmd(
-            "Page.addScriptToEvaluateOnNewDocument",
-            {
-                "source": """
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-            """
-            },
-        )
+        print(f"[Browser] Launching Chrome with maximum stealth... (Patched driver: {bool(patched_driver)})")
+        if service:
+            self.driver = webdriver.Chrome(service=service, options=options)
+        else:
+            self.driver = webdriver.Chrome(options=options)
+
+        # Apply comprehensive CDP anti-fingerprint evasions
+        apply_stealth_to_driver(self.driver)
 
         # Inject our network interceptor
         if INTERCEPTOR_PATH.exists():
