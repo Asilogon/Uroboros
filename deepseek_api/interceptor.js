@@ -1,7 +1,7 @@
 /**
- * DeepSeek Network Interceptor
- * Injected into the browser to capture all fetch & XHR requests,
- * headers, authorization tokens, payloads, files, and responses.
+ * DeepSeek Network Interceptor (Stealth & Native Code Protected)
+ * Only logs application API requests. Ignores all captcha and verification endpoints.
+ * Protects Function.prototype.toString to return '[native code]' for all wrapped methods.
  */
 (function () {
     if (window.__ds_interceptor_installed) return;
@@ -9,6 +9,41 @@
 
     window.__ds_logs = window.__ds_logs || [];
     window.__ds_auth_captured = window.__ds_auth_captured || {};
+
+    // 1. Native toString protection
+    const nativeToString = Function.prototype.toString;
+    const protectedFunctions = new WeakSet();
+
+    function markNative(fn) {
+        protectedFunctions.add(fn);
+        return fn;
+    }
+
+    Function.prototype.toString = function toString() {
+        if (protectedFunctions.has(this)) {
+            const name = this.name || '';
+            return 'function ' + name + '() { [native code] }';
+        }
+        return nativeToString.apply(this, arguments);
+    };
+    markNative(Function.prototype.toString);
+
+    // Filter out captcha and telemetry domains
+    function isCaptchaOrTelemetry(url) {
+        if (!url) return false;
+        const lower = String(url).toLowerCase();
+        return (
+            lower.includes('volces.com') ||
+            lower.includes('captcha') ||
+            lower.includes('turnstile') ||
+            lower.includes('geetest') ||
+            lower.includes('challenges.cloudflare') ||
+            lower.includes('hcaptcha') ||
+            lower.includes('recaptcha') ||
+            lower.includes('byteoversea') ||
+            lower.includes('bytedance')
+        );
+    }
 
     function sanitizeHeaders(headers) {
         const obj = {};
@@ -42,59 +77,53 @@
     function pushLog(entry) {
         entry.timestamp = new Date().toISOString();
         window.__ds_logs.push(entry);
-        if (window.__ds_logs.length > 1000) {
+        if (window.__ds_logs.length > 500) {
             window.__ds_logs.shift();
         }
     }
 
-    // 1. Intercept window.fetch
+    // 2. Intercept window.fetch (passes through captcha 100% untouched)
     const originalFetch = window.fetch;
-    window.fetch = async function (input, init = {}) {
+    const customFetch = async function fetch(input, init) {
         const url = (typeof input === 'string') ? input : (input && input.url ? input.url : String(input));
-        const method = (init.method || (input && input.method) || 'GET').toUpperCase();
-        const headers = sanitizeHeaders(init.headers || (input && input.headers));
+
+        // If captcha or telemetry, DO NOT touch or clone!
+        if (isCaptchaOrTelemetry(url)) {
+            return originalFetch.apply(this, arguments);
+        }
+
+        const method = (init && init.method) || (input && input.method) || 'GET';
+        const headers = sanitizeHeaders((init && init.headers) || (input && input.headers));
 
         checkAuthHeaders(headers);
 
         let serializedBody = null;
         let fileInfo = null;
 
-        if (init.body) {
+        if (init && init.body) {
             if (typeof init.body === 'string') {
-                try {
-                    serializedBody = JSON.parse(init.body);
-                } catch (e) {
-                    serializedBody = init.body;
-                }
+                try { serializedBody = JSON.parse(init.body); } catch (e) { serializedBody = init.body; }
             } else if (init.body instanceof FormData) {
                 serializedBody = {};
                 fileInfo = [];
                 for (const [key, val] of init.body.entries()) {
                     if (val instanceof File || val instanceof Blob) {
-                        const info = {
-                            field: key,
-                            name: val.name || 'blob',
-                            size: val.size,
-                            type: val.type,
-                            lastModified: val.lastModified
-                        };
+                        const info = { field: key, name: val.name || 'blob', size: val.size, type: val.type };
                         fileInfo.push(info);
                         serializedBody[key] = info;
                     } else {
                         serializedBody[key] = val;
                     }
                 }
-            } else if (init.body instanceof URLSearchParams) {
-                serializedBody = init.body.toString();
             }
         }
 
-        const reqId = Math.random().toString(36).substring(2, 10);
+        const reqId = Math.random().toString(36).substring(2, 9);
         pushLog({
             id: reqId,
             type: 'fetch',
             kind: 'request',
-            method: method,
+            method: method.toUpperCase(),
             url: url,
             headers: headers,
             body: serializedBody,
@@ -112,7 +141,7 @@
                     id: reqId,
                     type: 'fetch',
                     kind: 'response_stream',
-                    method: method,
+                    method: method.toUpperCase(),
                     url: url,
                     status: clone.status,
                     statusText: clone.statusText,
@@ -122,19 +151,14 @@
                 clone.text().then(text => {
                     let body = text;
                     try { body = JSON.parse(text); } catch (e) {}
-
-                    // Auto-detect user token from response body if present
-                    if (body && typeof body === 'object') {
-                        if (body.data && body.data.token) {
-                            window.__ds_auth_captured.token = body.data.token;
-                        }
+                    if (body && typeof body === 'object' && body.data && body.data.token) {
+                        window.__ds_auth_captured.token = body.data.token;
                     }
-
                     pushLog({
                         id: reqId,
                         type: 'fetch',
                         kind: 'response',
-                        method: method,
+                        method: method.toUpperCase(),
                         url: url,
                         status: clone.status,
                         statusText: clone.statusText,
@@ -150,64 +174,52 @@
                 id: reqId,
                 type: 'fetch',
                 kind: 'error',
-                method: method,
+                method: method.toUpperCase(),
                 url: url,
                 error: String(err)
             });
             throw err;
         }
     };
+    markNative(customFetch);
+    window.fetch = customFetch;
 
-    // 2. Intercept XMLHttpRequest
+    // 3. Intercept XMLHttpRequest
     const origOpen = XMLHttpRequest.prototype.open;
     const origSend = XMLHttpRequest.prototype.send;
     const origSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
-    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-        this.__ds_data = {
-            id: Math.random().toString(36).substring(2, 10),
-            type: 'xhr',
-            method: (method || 'GET').toUpperCase(),
-            url: String(url),
-            headers: {}
-        };
+    const customOpen = function open(method, url, ...rest) {
+        if (!isCaptchaOrTelemetry(url)) {
+            this.__ds_data = {
+                id: Math.random().toString(36).substring(2, 9),
+                type: 'xhr',
+                method: (method || 'GET').toUpperCase(),
+                url: String(url),
+                headers: {}
+            };
+        }
         return origOpen.apply(this, [method, url, ...rest]);
     };
+    markNative(customOpen);
+    XMLHttpRequest.prototype.open = customOpen;
 
-    XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
+    const customSetRequestHeader = function setRequestHeader(header, value) {
         if (this.__ds_data && this.__ds_data.headers) {
             this.__ds_data.headers[header.toLowerCase()] = value;
             checkAuthHeaders(this.__ds_data.headers);
         }
         return origSetRequestHeader.apply(this, arguments);
     };
+    markNative(customSetRequestHeader);
+    XMLHttpRequest.prototype.setRequestHeader = customSetRequestHeader;
 
-    XMLHttpRequest.prototype.send = function (body) {
+    const customSend = function send(body) {
         if (this.__ds_data) {
             let serializedBody = body;
-            let fileInfo = null;
-
             if (typeof body === 'string') {
                 try { serializedBody = JSON.parse(body); } catch (e) {}
-            } else if (body instanceof FormData) {
-                serializedBody = {};
-                fileInfo = [];
-                for (const [key, val] of body.entries()) {
-                    if (val instanceof File || val instanceof Blob) {
-                        const info = {
-                            field: key,
-                            name: val.name || 'blob',
-                            size: val.size,
-                            type: val.type
-                        };
-                        fileInfo.push(info);
-                        serializedBody[key] = info;
-                    } else {
-                        serializedBody[key] = val;
-                    }
-                }
             }
-
             pushLog({
                 id: this.__ds_data.id,
                 type: 'xhr',
@@ -215,8 +227,7 @@
                 method: this.__ds_data.method,
                 url: this.__ds_data.url,
                 headers: this.__ds_data.headers,
-                body: serializedBody,
-                files: fileInfo
+                body: serializedBody
             });
 
             this.addEventListener('load', () => {
@@ -236,6 +247,8 @@
         }
         return origSend.apply(this, arguments);
     };
+    markNative(customSend);
+    XMLHttpRequest.prototype.send = customSend;
 
-    console.log('[DeepSeek Interceptor] Initialized successfully.');
+    console.log('[Interceptor] Protected network logger active.');
 })();
