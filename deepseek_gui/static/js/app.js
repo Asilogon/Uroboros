@@ -1,13 +1,13 @@
 /**
- * DeepSeek API Studio - Antigravity UI Client Logic
+ * Uroboros - Client Logic & Settings Manager
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  let activeChatId = "sample-uroboros-1";
+  let activeChatId = null;
   let attachedFiles = [];
   let isGenerating = false;
   let activeAbortController = null;
-  let currentModel = "Gemini 3.8 Flash High";
+  let currentModel = "DeepSeek-V3";
   let thinkingEnabled = false;
 
   // DOM Elements
@@ -20,23 +20,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnModelSelect = document.getElementById("btnModelSelect");
   const modelLabel = document.getElementById("modelLabel");
   const btnNewChat = document.getElementById("btnNewChat");
-  const btnLaunchSelenium = document.getElementById("btnLaunchSelenium");
+  const conversationsList = document.getElementById("conversationsList");
+  const chatCountBadge = document.getElementById("chatCountBadge");
+  const activeChatTitle = document.getElementById("activeChatTitle");
   const networkLogsList = document.getElementById("networkLogsList");
   const uploadedFilesList = document.getElementById("uploadedFilesList");
   const authStatusDot = document.getElementById("authStatusDot");
-  const cookieCount = document.getElementById("cookieCount");
-  const tokenPreview = document.getElementById("tokenPreview");
-  const sessionTime = document.getElementById("sessionTime");
-  const authStatusText = document.getElementById("authStatusText");
-  const btnCopyCode = document.getElementById("btnCopyCode");
-  const codeSnippet = document.getElementById("codeSnippet");
+
+  // Settings Modal Elements
+  const settingsModal = document.getElementById("settingsModal");
+  const btnOpenSettings = document.getElementById("btnOpenSettings");
+  const btnCloseSettings = document.getElementById("btnCloseSettings");
+  const btnCancelSettings = document.getElementById("btnCancelSettings");
+  const btnSaveToken = document.getElementById("btnSaveToken");
+  const btnClearSession = document.getElementById("btnClearSession");
+  const settingTokenInput = document.getElementById("settingTokenInput");
+  const btnToggleTokenVisibility = document.getElementById("btnToggleTokenVisibility");
+  const btnSettingsLaunchSelenium = document.getElementById("btnSettingsLaunchSelenium");
+  const settingsAuthStatusText = document.getElementById("settingsAuthStatusText");
+  const settingsCookieCount = document.getElementById("settingsCookieCount");
+  const settingsSavedAt = document.getElementById("settingsSavedAt");
 
   // 1. TABS SWITCHING (RIGHT PANEL)
   const tabBtns = document.querySelectorAll(".tab-btn");
   const tabPanes = {
     terminal: document.getElementById("tabContentTerminal"),
     files: document.getElementById("tabContentFiles"),
-    auth: document.getElementById("tabContentAuth"),
     review: document.getElementById("tabContentReview"),
   };
 
@@ -54,52 +63,120 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  document.getElementById("btnOpenSettings")?.addEventListener("click", () => {
-    // Switch to Selenium tab
-    const authTabBtn = document.querySelector('.tab-btn[data-tab="auth"]');
-    if (authTabBtn) authTabBtn.click();
-  });
-
-  document.getElementById("btnOpenReview")?.addEventListener("click", () => {
-    const revTabBtn = document.querySelector('.tab-btn[data-tab="review"]');
-    if (revTabBtn) revTabBtn.click();
-  });
-
-  // 2. CHECK STATUS (POLL)
-  async function checkStatus() {
+  // 2. SETTINGS MODAL LOGIC (TOKEN & AUTH)
+  async function loadSettingsData() {
     try {
       const resp = await fetch("/api/status");
       const data = await resp.json();
-      if (data.logged_in) {
-        if (authStatusDot) authStatusDot.className = "status-indicator";
-        if (authStatusText) {
-          authStatusText.textContent = "Active";
-          authStatusText.style.color = "var(--accent-green)";
-        }
-      } else {
-        if (authStatusDot) authStatusDot.className = "status-indicator red";
-        if (authStatusText) {
-          authStatusText.textContent = "Offline / Need Login";
-          authStatusText.style.color = "var(--accent-red)";
-        }
+
+      if (settingTokenInput) {
+        settingTokenInput.value = data.token || "";
+      }
+      if (settingsCookieCount) {
+        settingsCookieCount.textContent = data.cookies_count || 0;
+      }
+      if (settingsSavedAt) {
+        settingsSavedAt.textContent = data.saved_at || "-";
       }
 
-      if (cookieCount) cookieCount.textContent = data.cookies_count || 0;
-      if (tokenPreview) tokenPreview.textContent = data.token_preview || "Нет";
-      if (sessionTime) sessionTime.textContent = data.saved_at || "-";
+      if (data.logged_in) {
+        if (settingsAuthStatusText) {
+          settingsAuthStatusText.textContent = "Авторизован (Active)";
+          settingsAuthStatusText.style.color = "var(--accent-green)";
+        }
+        if (authStatusDot) authStatusDot.className = "status-indicator";
+      } else {
+        if (settingsAuthStatusText) {
+          settingsAuthStatusText.textContent = "Не авторизован (Нужен токен или вход)";
+          settingsAuthStatusText.style.color = "var(--accent-red)";
+        }
+        if (authStatusDot) authStatusDot.className = "status-indicator red";
+      }
     } catch (e) {
-      console.warn("Status check failed", e);
+      console.warn("Error fetching status:", e);
     }
   }
 
-  checkStatus();
-  setInterval(checkStatus, 5000);
+  if (btnOpenSettings) {
+    btnOpenSettings.addEventListener("click", () => {
+      loadSettingsData();
+      settingsModal.style.display = "flex";
+    });
+  }
 
-  // 3. LAUNCH SELENIUM
-  if (btnLaunchSelenium) {
-    btnLaunchSelenium.addEventListener("click", async () => {
-      btnLaunchSelenium.disabled = true;
-      btnLaunchSelenium.innerHTML = `<span>Запуск Chrome...</span>`;
+  function closeSettings() {
+    settingsModal.style.display = "none";
+  }
+
+  if (btnCloseSettings) btnCloseSettings.addEventListener("click", closeSettings);
+  if (btnCancelSettings) btnCancelSettings.addEventListener("click", closeSettings);
+
+  // Close modal when clicking on backdrop
+  if (settingsModal) {
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) closeSettings();
+    });
+  }
+
+  // Toggle token input visibility
+  if (btnToggleTokenVisibility && settingTokenInput) {
+    btnToggleTokenVisibility.addEventListener("click", () => {
+      if (settingTokenInput.type === "password") {
+        settingTokenInput.type = "text";
+        btnToggleTokenVisibility.textContent = "🔒";
+      } else {
+        settingTokenInput.type = "password";
+        btnToggleTokenVisibility.textContent = "👁";
+      }
+    });
+  }
+
+  // Save Token
+  if (btnSaveToken) {
+    btnSaveToken.addEventListener("click", async () => {
+      const token = settingTokenInput.value.trim();
+      btnSaveToken.disabled = true;
+      btnSaveToken.textContent = "Сохранение...";
+
+      try {
+        const resp = await fetch("/api/settings/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token }),
+        });
+        const res = await resp.json();
+        alert(res.message || "Токен сохранен!");
+        loadSettingsData();
+        closeSettings();
+      } catch (err) {
+        alert("Ошибка сохранения: " + err);
+      } finally {
+        btnSaveToken.disabled = false;
+        btnSaveToken.textContent = "Сохранить токен";
+      }
+    });
+  }
+
+  // Clear Session
+  if (btnClearSession) {
+    btnClearSession.addEventListener("click", async () => {
+      if (!confirm("Вы уверены, что хотите удалить сохраненные куки и токен?")) return;
+      try {
+        const resp = await fetch("/api/settings/clear", { method: "POST" });
+        const res = await resp.json();
+        alert(res.message || "Сессия очищена.");
+        loadSettingsData();
+      } catch (err) {
+        alert("Ошибка: " + err);
+      }
+    });
+  }
+
+  // Launch Selenium inside settings
+  if (btnSettingsLaunchSelenium) {
+    btnSettingsLaunchSelenium.addEventListener("click", async () => {
+      btnSettingsLaunchSelenium.disabled = true;
+      btnSettingsLaunchSelenium.innerHTML = `<span>Запуск Chrome...</span>`;
 
       try {
         const resp = await fetch("/api/auth/start_selenium", { method: "POST" });
@@ -109,16 +186,132 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Ошибка запуска браузера: " + err);
       } finally {
         setTimeout(() => {
-          btnLaunchSelenium.disabled = false;
-          btnLaunchSelenium.innerHTML = `
+          btnSettingsLaunchSelenium.disabled = false;
+          btnSettingsLaunchSelenium.innerHTML = `
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             <span>Войти через Selenium</span>
           `;
-          checkStatus();
+          loadSettingsData();
         }, 3000);
       }
     });
   }
+
+  loadSettingsData();
+  setInterval(loadSettingsData, 6000);
+
+  // 3. CONVERSATIONS MANAGEMENT (START FROM SCRATCH)
+  async function loadConversations() {
+    try {
+      const resp = await fetch("/api/chats");
+      const data = await resp.json();
+      const chats = data.chats || [];
+
+      if (chatCountBadge) chatCountBadge.textContent = chats.length;
+      conversationsList.innerHTML = "";
+
+      if (chats.length === 0) {
+        conversationsList.innerHTML = `
+          <div class="empty-chats-hint">
+            Нет диалогов.<br>Нажмите <strong>+ New Conversation</strong> выше, чтобы создать чат.
+          </div>
+        `;
+        return;
+      }
+
+      chats.forEach((chat, idx) => {
+        const item = document.createElement("div");
+        item.className = "chat-item" + (chat.id === activeChatId ? " active" : "");
+        item.setAttribute("data-id", chat.id);
+
+        item.innerHTML = `
+          <span class="chat-title-text" title="${chat.title}">${chat.title || "Новый диалог"}</span>
+          <span class="chat-time-badge">${chat.updated_at || ""}</span>
+          <button class="chat-delete-btn" title="Удалить диалог">&#10005;</button>
+        `;
+
+        item.querySelector(".chat-title-text").addEventListener("click", () => {
+          selectChat(chat.id, chat.title);
+        });
+
+        item.querySelector(".chat-delete-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteChat(chat.id);
+        });
+
+        conversationsList.appendChild(item);
+
+        // Select first chat if none selected
+        if (!activeChatId && idx === 0) {
+          selectChat(chat.id, chat.title);
+        }
+      });
+    } catch (e) {
+      console.warn("Failed loading chats:", e);
+    }
+  }
+
+  function selectChat(chatId, title) {
+    activeChatId = chatId;
+    if (activeChatTitle) activeChatTitle.textContent = title || "Диалог";
+
+    document.querySelectorAll(".chat-item").forEach((el) => {
+      el.classList.toggle("active", el.getAttribute("data-id") === chatId);
+    });
+
+    // Clear feed for this chat
+    messagesContainer.innerHTML = `
+      <div style="text-align: center; color: var(--text-dim); margin-top: 50px; font-size: 13px;">
+        Активный диалог: <strong>${title || "Новый диалог"}</strong><br>
+        <span style="font-size: 11.5px;">Отправьте сообщение ниже.</span>
+      </div>
+    `;
+  }
+
+  async function createNewChat() {
+    try {
+      const resp = await fetch("/api/chats/new", { method: "POST" });
+      const data = await resp.json();
+      activeChatId = data.chat_id;
+      if (activeChatTitle) activeChatTitle.textContent = data.title || "Новый диалог";
+
+      messagesContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-dim); margin-top: 50px; font-size: 13px;">
+          Создан новый диалог (${activeChatId}).<br>
+          <span style="font-size: 11.5px;">Отправьте сообщение ниже, чтобы начать общение.</span>
+        </div>
+      `;
+
+      loadConversations();
+    } catch (err) {
+      alert("Ошибка создания чата: " + err);
+    }
+  }
+
+  async function deleteChat(chatId) {
+    if (!confirm("Удалить этот диалог?")) return;
+    try {
+      await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
+      if (activeChatId === chatId) {
+        activeChatId = null;
+        if (activeChatTitle) activeChatTitle.textContent = "New Conversation";
+        messagesContainer.innerHTML = `
+          <div class="empty-chats-hint">
+            Диалог удален. Нажмите <strong>+ New Conversation</strong> для создания нового.
+          </div>
+        `;
+      }
+      loadConversations();
+    } catch (err) {
+      alert("Ошибка удаления: " + err);
+    }
+  }
+
+  if (btnNewChat) {
+    btnNewChat.addEventListener("click", createNewChat);
+  }
+
+  loadConversations();
 
   // 4. ATTACH FILES
   if (btnAttachFile && hiddenFileInput) {
@@ -155,7 +348,6 @@ document.addEventListener("DOMContentLoaded", () => {
             attachedFiles = attachedFiles.filter((f) => f.id !== data.id);
           });
 
-          // Add to files tab
           if (uploadedFilesList) {
             const item = document.createElement("div");
             item.className = "log-item";
@@ -171,7 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } catch (err) {
         chip.remove();
-        alert("Сетевая ошибка загрузки файла: " + err);
+        alert("Сетевая ошибка загрузки: " + err);
       }
       hiddenFileInput.value = "";
     });
@@ -195,9 +387,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 6. MODEL SELECTOR
   if (btnModelSelect) {
     const models = [
-      "Gemini 3.8 Flash High",
       "DeepSeek-V3",
       "DeepSeek-R1 (Thinking)",
+      "DeepSeek-Chat",
     ];
     let modelIdx = 0;
     btnModelSelect.addEventListener("click", () => {
@@ -211,7 +403,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // 7. SEND MESSAGE / SSE STREAM
   async function handleSendMessage() {
     if (isGenerating) {
-      // Abort generation
       if (activeAbortController) {
         activeAbortController.abort();
         activeAbortController = null;
@@ -222,6 +413,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const promptText = chatPromptInput.value.trim();
     if (!promptText && attachedFiles.length === 0) return;
+
+    if (!activeChatId) {
+      await createNewChat();
+    }
+
+    // Remove empty state message if present
+    const emptyState = document.getElementById("emptyFeedState");
+    if (emptyState) emptyState.remove();
 
     // 1. Render User Message
     const userCard = document.createElement("div");
@@ -248,7 +447,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const titleEl = document.createElement("div");
     titleEl.className = "assistant-title";
-    titleEl.textContent = "Ответ DeepSeek (" + currentModel + "):";
+    titleEl.textContent = "Ответ " + currentModel + ":";
     assistantCard.appendChild(titleEl);
 
     // Thinking box
@@ -265,8 +464,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Footer
     const footerEl = document.createElement("div");
     footerEl.className = "message-footer";
-    footerEl.innerHTML = `<span>только что</span> <span title="Copy">&#128203;</span> <span title="Like">&#128077;</span>`;
+    footerEl.innerHTML = `<span>только что</span> <span class="copy-ans" title="Copy">&#128203;</span> <span title="Like">&#128077;</span>`;
     assistantCard.appendChild(footerEl);
+
+    footerEl.querySelector(".copy-ans").addEventListener("click", () => {
+      navigator.clipboard.writeText(contentBox.innerText);
+    });
 
     messagesContainer.appendChild(assistantCard);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -296,7 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop(); // keep partial
+        buffer = lines.pop();
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -314,12 +517,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 contentBox.textContent += `\n[Ошибка: ${chunk.message}]`;
               }
               messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            } catch (e) {
-              // Ignore non-json lines
-            }
+            } catch (e) {}
           }
         }
       }
+
+      loadConversations();
     } catch (err) {
       if (err.name !== "AbortError") {
         contentBox.textContent += `\n[Ошибка соединения: ${err.message}]`;
@@ -334,7 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
     isGenerating = generating;
     if (generating) {
       btnSendMessage.classList.add("stop");
-      btnSendMessage.innerHTML = `<span style="font-size: 11px;">&#9632;</span>`; // square stop icon
+      btnSendMessage.innerHTML = `<span style="font-size: 11px;">&#9632;</span>`;
       btnSendMessage.title = "Остановить генерацию";
     } else {
       btnSendMessage.classList.remove("stop");
@@ -349,36 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnSendMessage.addEventListener("click", handleSendMessage);
   }
 
-  // 8. NEW CHAT
-  if (btnNewChat) {
-    btnNewChat.addEventListener("click", async () => {
-      try {
-        const resp = await fetch("/api/chats/new", { method: "POST" });
-        const data = await resp.json();
-        activeChatId = data.chat_id;
-        document.getElementById("activeChatTitle").textContent = "New Conversation";
-        messagesContainer.innerHTML = `
-          <div style="text-align: center; color: var(--text-dim); margin-top: 40px; font-size: 13px;">
-            Создан новый диалог DeepSeek (${activeChatId}). Введите сообщение ниже.
-          </div>
-        `;
-      } catch (err) {
-        alert("Ошибка создания чата: " + err);
-      }
-    });
-  }
-
-  // 9. COPY CODE
-  if (btnCopyCode && codeSnippet) {
-    btnCopyCode.addEventListener("click", () => {
-      navigator.clipboard.writeText(codeSnippet.innerText).then(() => {
-        btnCopyCode.textContent = "✓";
-        setTimeout(() => (btnCopyCode.textContent = "📋"), 1500);
-      });
-    });
-  }
-
-  // 10. NETWORK LOGS POLLER
+  // 8. NETWORK LOGS POLLER
   async function pollLogs() {
     try {
       const resp = await fetch("/api/logs?limit=25");
@@ -414,20 +588,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
         networkLogsList.appendChild(item);
       });
-    } catch (e) {
-      // ignore poll error
-    }
+    } catch (e) {}
   }
 
   pollLogs();
   setInterval(pollLogs, 2500);
-// 11. WINDOW CONTROLS (PYWEBVIEW INTEGRATION)
-  const btnWinMinimize = document.getElementById('btnWinMinimize');
-  const btnWinMaximize = document.getElementById('btnWinMaximize');
-  const btnWinClose = document.getElementById('btnWinClose');
+
+  // 9. WINDOW CONTROLS (PYWEBVIEW INTEGRATION)
+  const btnWinMinimize = document.getElementById("btnWinMinimize");
+  const btnWinMaximize = document.getElementById("btnWinMaximize");
+  const btnWinClose = document.getElementById("btnWinClose");
 
   if (btnWinMinimize) {
-    btnWinMinimize.addEventListener('click', () => {
+    btnWinMinimize.addEventListener("click", () => {
       if (window.pywebview && window.pywebview.api && window.pywebview.api.minimize) {
         window.pywebview.api.minimize();
       }
@@ -435,7 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (btnWinMaximize) {
-    btnWinMaximize.addEventListener('click', () => {
+    btnWinMaximize.addEventListener("click", () => {
       if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_maximize) {
         window.pywebview.api.toggle_maximize();
       }
@@ -443,7 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (btnWinClose) {
-    btnWinClose.addEventListener('click', () => {
+    btnWinClose.addEventListener("click", () => {
       if (window.pywebview && window.pywebview.api && window.pywebview.api.close) {
         window.pywebview.api.close();
       } else {

@@ -26,7 +26,10 @@ app = Flask(
     static_folder=str(Path(__file__).parent / "static"),
 )
 
-SESSION_FILE = ROOT_DIR / "data" / "session.json"
+DATA_DIR = ROOT_DIR / "data"
+SESSION_FILE = DATA_DIR / "session.json"
+CHATS_FILE = DATA_DIR / "chats.json"
+
 browser_instance = None
 browser_thread = None
 active_client = None
@@ -41,6 +44,22 @@ def get_client() -> DeepSeekClient:
     return active_client
 
 
+def load_local_chats() -> List[Dict[str, Any]]:
+    if CHATS_FILE.exists():
+        try:
+            with open(CHATS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def save_local_chats(chats: List[Dict[str, Any]]):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CHATS_FILE, "w", encoding="utf-8") as f:
+        json.dump(chats, f, indent=2, ensure_ascii=False)
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -52,6 +71,7 @@ def api_status():
     saved_at = None
     cookies_count = 0
     token = None
+    user_agent = None
 
     if SESSION_FILE.exists():
         try:
@@ -61,6 +81,7 @@ def api_status():
             cookies = data.get("cookies", [])
             cookies_count = len(cookies)
             saved_at = data.get("saved_at")
+            user_agent = data.get("user_agent")
             if token or cookies_count > 0:
                 logged_in = True
         except Exception:
@@ -68,10 +89,51 @@ def api_status():
 
     return jsonify({
         "logged_in": logged_in,
+        "token": token or "",
         "token_preview": (token[:12] + "...") if token else None,
         "cookies_count": cookies_count,
-        "saved_at": saved_at,
+        "saved_at": saved_at or "Не сохранено",
+        "user_agent": user_agent or "Default",
     })
+
+
+@app.route("/api/settings/save", methods=["POST"])
+def api_save_settings():
+    data = request.json or {}
+    token = data.get("token", "").strip()
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    session_data = {}
+    if SESSION_FILE.exists():
+        try:
+            with open(SESSION_FILE, "r", encoding="utf-8") as f:
+                session_data = json.load(f)
+        except Exception:
+            session_data = {}
+
+    session_data["token"] = token if token else None
+    session_data["saved_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    with open(SESSION_FILE, "w", encoding="utf-8") as f:
+        json.dump(session_data, f, indent=2, ensure_ascii=False)
+
+    # Reload client session
+    get_client().load_session()
+
+    return jsonify({"success": True, "message": "Токен успешно сохранен!"})
+
+
+@app.route("/api/settings/clear", methods=["POST"])
+def api_clear_settings():
+    if SESSION_FILE.exists():
+        try:
+            os.remove(SESSION_FILE)
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+
+    global active_client
+    active_client = None
+    return jsonify({"success": True, "message": "Сессия очищена."})
 
 
 @app.route("/api/auth/start_selenium", methods=["POST"])
@@ -106,66 +168,61 @@ def api_start_selenium():
 def api_get_chats():
     client = get_client()
     try:
-        chats = client.list_chats(page=1, page_size=20)
-        return jsonify({"success": True, "chats": chats})
-    except Exception as e:
-        # Return friendly fallback sample list if not authenticated yet
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "chats": [
-                {
-                    "id": "sample-uroboros-1",
-                    "title": "DeepSeek API Automation With Selenium",
-                    "updated_at": "4m ago",
-                    "project": "Uroboros",
-                    "active": True
-                },
-                {
-                    "id": "sample-haircuts-1",
-                    "title": "Untitled Conversation",
-                    "updated_at": "16h",
-                    "project": "Haircuts",
-                    "active": False
-                },
-                {
-                    "id": "sample-evo-1",
-                    "title": "Fixing Avito Parser And UI",
-                    "updated_at": "19h",
-                    "project": "EVO",
-                    "active": False
-                },
-                {
-                    "id": "sample-evo-2",
-                    "title": "Архитектура и Дизайн Проекта",
-                    "updated_at": "3d",
-                    "project": "EVO",
-                    "active": False
-                }
-            ]
-        })
+        remote_chats = client.list_chats(page=1, page_size=30)
+        formatted = []
+        for c in remote_chats:
+            formatted.append({
+                "id": c.get("id"),
+                "title": c.get("title") or "Новый диалог",
+                "updated_at": c.get("updated_at") or "недавно",
+            })
+        if formatted:
+            save_local_chats(formatted)
+            return jsonify({"success": True, "chats": formatted})
+    except Exception:
+        pass
+
+    # Return local clean chats list
+    local_chats = load_local_chats()
+    return jsonify({"success": True, "chats": local_chats})
 
 
 @app.route("/api/chats/new", methods=["POST"])
 def api_new_chat():
     client = get_client()
+    chat_id = None
     try:
         chat_id = client.create_chat()
-        return jsonify({"success": True, "chat_id": chat_id})
-    except Exception as e:
-        # Fallback offline generated id
-        offline_id = f"chat_{int(time.time())}"
-        return jsonify({"success": False, "error": str(e), "chat_id": offline_id})
+    except Exception:
+        chat_id = f"chat_{int(time.time())}"
+
+    new_entry = {
+        "id": chat_id,
+        "title": "Новый диалог",
+        "updated_at": "только что",
+    }
+    chats = load_local_chats()
+    chats.insert(0, new_entry)
+    save_local_chats(chats)
+
+    return jsonify({"success": True, "chat_id": chat_id, "title": new_entry["title"]})
 
 
 @app.route("/api/chats/<chat_id>", methods=["DELETE"])
 def api_delete_chat(chat_id):
-    client = get_client()
+    # Try deleting remotely
     try:
-        success = client.delete_chat(chat_id)
-        return jsonify({"success": success})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        client = get_client()
+        client.delete_chat(chat_id)
+    except Exception:
+        pass
+
+    # Remove from local list
+    chats = load_local_chats()
+    chats = [c for c in chats if c.get("id") != chat_id]
+    save_local_chats(chats)
+
+    return jsonify({"success": True})
 
 
 @app.route("/api/chats/<chat_id>/message", methods=["POST"])
@@ -174,6 +231,15 @@ def api_send_message(chat_id):
     prompt = data.get("prompt", "")
     thinking_enabled = data.get("thinking_enabled", False)
     ref_file_ids = data.get("ref_file_ids", [])
+
+    # Update title in local list if it's the first message
+    chats = load_local_chats()
+    for c in chats:
+        if c.get("id") == chat_id and (c.get("title") == "Новый диалог" or not c.get("title")):
+            c["title"] = (prompt[:32] + "...") if len(prompt) > 32 else prompt
+            c["updated_at"] = "только что"
+            break
+    save_local_chats(chats)
 
     client = get_client()
 
@@ -220,7 +286,6 @@ def api_upload_file():
             "size": temp_path.stat().st_size,
         })
     except Exception as e:
-        # Fallback file id for offline simulation if not logged in
         file_id = f"file_{int(time.time()*1000)}"
         return jsonify({
             "success": True,

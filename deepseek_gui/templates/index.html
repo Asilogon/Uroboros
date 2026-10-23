@@ -68,58 +68,16 @@
         </div>
       </div>
 
-      <!-- PROJECTS & CONVERSATIONS TREE -->
+      <!-- DYNAMIC CONVERSATIONS LIST (NO HARDCODED PROJECTS) -->
       <div class="projects-section">
         <div class="projects-header">
-          <span>Projects</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="7" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/></svg>
+          <span>Conversations</span>
+          <span id="chatCountBadge" style="font-size: 11px; color: var(--text-dim);">0</span>
         </div>
 
-        <!-- UROBOROS -->
-        <div class="project-group">
-          <div class="project-group-title">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>Uroboros</span>
-          </div>
-          <div class="chat-item active" id="chatItemActive" data-id="active-session">
-            <span class="chat-title-text">DeepSeek API Automation...</span>
-            <span class="chat-time-badge">4m</span>
-            <button class="chat-delete-btn" title="Удалить">&#10005;</button>
-          </div>
+        <div id="conversationsList" class="conversations-list">
+          <!-- Populated dynamically via JS from scratch -->
         </div>
-
-        <!-- HAIRCUTS -->
-        <div class="project-group">
-          <div class="project-group-title">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>Haircuts</span>
-          </div>
-          <div class="chat-item" data-id="chat-haircuts-1">
-            <span class="chat-title-text">Untitled Conversation</span>
-            <span class="chat-time-badge">16h</span>
-            <button class="chat-delete-btn" title="Удалить">&#10005;</button>
-          </div>
-        </div>
-
-        <!-- EVO -->
-        <div class="project-group">
-          <div class="project-group-title">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>EVO</span>
-          </div>
-          <div class="chat-item" data-id="chat-evo-1">
-            <span class="chat-title-text">Fixing Avito Parser And UI</span>
-            <span class="chat-time-badge">19h</span>
-            <button class="chat-delete-btn" title="Удалить">&#10005;</button>
-          </div>
-          <div class="chat-item" data-id="chat-evo-2">
-            <span class="chat-title-text">Архитектура и Дизайн Пр...</span>
-            <span class="chat-time-badge">3d</span>
-            <button class="chat-delete-btn" title="Удалить">&#10005;</button>
-          </div>
-        </div>
-
-        <div id="dynamicChatsList"></div>
       </div>
 
       <!-- SIDEBAR BOTTOM -->
@@ -128,7 +86,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>Settings</span>
         </div>
-        <span id="authStatusDot" class="status-indicator" title="Selenium Status"></span>
+        <span id="authStatusDot" class="status-indicator" title="Selenium & Token Status"></span>
       </div>
     </aside>
 
@@ -139,7 +97,7 @@
         <div class="chat-breadcrumb">
           <span>Uroboros</span>
           <span>/</span>
-          <strong id="activeChatTitle">DeepSeek API Automation With Selenium</strong>
+          <strong id="activeChatTitle">New Conversation</strong>
         </div>
         <div class="chat-header-actions">
           <button class="icon-btn" title="Share">&#128172;</button>
@@ -150,69 +108,11 @@
 
       <!-- MESSAGES FEED -->
       <div class="chat-messages-scroll" id="messagesContainer">
-        <!-- 1. USER MESSAGE (Exact text from screenshot) -->
-        <div class="message-user-card">
-          Нужно сделать API для https://chat.deepseek.com/ нужно при помощи селениума зайти на сайт. Нужно дождатсья пока я залагинюс и сохранить куки. Нужно вести все логи с сайта смотреть реквесты и файлы. Нужно будет использовать реквесты для запросов. Создание чат, писать в чат, удалять чати, прекреплоять файлы, и другие фунции которые буут в дальнейшем
-        </div>
-
-        <!-- 2. ASSISTANT MESSAGE (Exact layout from screenshot) -->
-        <div class="message-assistant-card">
-          <div class="assistant-title">Использование в коде на Python</div>
-
-          <!-- THINKING ACCORDION (If model thinks) -->
-          <div class="thinking-expander" id="thinkingBox">
-            <strong>DeepThink R1:</strong> <span id="thinkingContent"></span>
-          </div>
-
-          <!-- CODE CONTAINER -->
-          <div class="code-container">
-            <div class="code-header">
-              <span>python</span>
-              <div class="code-actions">
-                <span title="Mention">@</span>
-                <span id="btnCopyCode" title="Copy code">&#128203;</span>
-              </div>
-            </div>
-            <pre class="code-body" id="codeSnippet">from deepseek_api import DeepSeekClient
-
-# Инициализируем клиент (сессия автоматически подгружается из data/session.json)
-client = DeepSeekClient()
-
-# 1. Создаем чат
-chat_id = client.create_chat()
-
-# 2. Отправляем сообщение со стримингом
-for chunk in client.send_message(chat_id, "Привет! Расскажи о себе.", stream=True):
-    print(chunk["content"], end="", flush=True)
-
-# 3. Прикрепляем файл
-file_info = client.upload_file("document.pdf")
-for chunk in client.send_message(chat_id, "Сделай выжимку документа", ref_file_ids=[file_info["id"]]):
-    print(chunk["content"], end="", flush=True)
-
-# 4. Удаляем чат
-client.delete_chat(chat_id)</pre>
-          </div>
-
-          <!-- DIFF / CHANGES BADGE -->
-          <div class="diff-badge-bar">
-            <span>13 files changed</span>
-            <span class="diff-green">+1599</span>
-            <span class="diff-red">-1</span>
-            <span>&gt;</span>
-            <div class="review-pill" id="btnOpenReview">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              <span>Review</span>
-            </div>
-          </div>
-
-          <!-- FOOTER -->
-          <div class="message-footer">
-            <span>4m ago</span>
-            <span title="Copy">&#128203;</span>
-            <span title="Like">&#128077;</span>
-            <span title="Dislike">&#128078;</span>
-          </div>
+        <div id="emptyFeedState" style="text-align: center; color: var(--text-dim); margin-top: 60px; font-size: 13.5px; line-height: 1.8;">
+          <div style="font-size: 24px; margin-bottom: 8px;">♾️</div>
+          <strong style="color: var(--text-main); font-size: 15px;">Uroboros DeepSeek API Client</strong><br>
+          Создавайте чаты с нуля, отправляйте запросы через requests и прикрепляйте файлы.<br>
+          <span style="font-size: 12px; color: var(--text-muted);">Настройте токен или войдите через Selenium в меню <strong>⚙ Settings</strong>.</span>
         </div>
       </div>
 
@@ -235,9 +135,9 @@ client.delete_chat(chat_id)</pre>
             </button>
             <input type="file" id="hiddenFileInput" style="display: none;">
 
-            <!-- Model selector pill matching screenshot -->
+            <!-- Model selector pill -->
             <button class="toolbar-pill" id="btnModelSelect">
-              <span id="modelLabel">Gemini 3.8 Flash High</span>
+              <span id="modelLabel">DeepSeek-V3</span>
               <span style="font-size: 10px;">&#9662;</span>
             </button>
           </div>
@@ -267,10 +167,6 @@ client.delete_chat(chat_id)</pre>
         <div class="tab-btn" data-tab="files">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
           <span>Files</span>
-        </div>
-        <div class="tab-btn" data-tab="auth">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span>Selenium</span>
         </div>
         <div class="tab-btn" data-tab="review">Review</div>
       </div>
@@ -302,34 +198,12 @@ client.delete_chat(chat_id)</pre>
           </div>
         </div>
 
-        <!-- 3. SELENIUM AUTH TAB -->
-        <div id="tabContentAuth" class="tab-pane" style="display: none;">
-          <div class="panel-card">
-            <div class="panel-card-title">
-              <span>Selenium Session</span>
-              <span id="authStatusText" style="color: var(--accent-green); font-size: 11px;">Active</span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-              Запустите Chrome для входа на сайт DeepSeek. Куки, токен и заголовки будут автоматически перехвачены и сохранены.
-            </p>
-            <button class="action-btn-primary" id="btnLaunchSelenium">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <span>Войти через Selenium</span>
-            </button>
-            <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">
-              <div>Куки: <strong id="cookieCount">0</strong></div>
-              <div>Токен: <strong id="tokenPreview">Нет</strong></div>
-              <div>Сохранено: <span id="sessionTime">-</span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. REVIEW TAB -->
+        <!-- 3. REVIEW TAB -->
         <div id="tabContentReview" class="tab-pane" style="display: none;">
           <div class="panel-card">
-            <div class="panel-card-title"><span>Review Changes</span></div>
-            <p style="font-size: 12px; color: var(--text-muted);">
-              13 файлов создано / обновлено. Полная поддержка requests, Proof-of-Work солвера, JS-перехватчика трафика и GUI.
+            <div class="panel-card-title"><span>System Overview</span></div>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+              Uroboros работает на чистых HTTP-реквестах с автоматическим Proof-of-Work WASM-солвером.
             </p>
           </div>
         </div>
@@ -338,10 +212,67 @@ client.delete_chat(chat_id)</pre>
       <!-- RIGHT PANEL FOOTER -->
       <div class="right-panel-footer">
         <span>Background Tasks</span>
-        <span style="font-weight: 600; color: var(--text-main);">5</span>
+        <span style="font-weight: 600; color: var(--text-main);">Active</span>
       </div>
     </aside>
 
+  </div>
+
+  <!-- 3. SETTINGS MODAL (TOKEN & AUTH SETTINGS) -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Настройки / DeepSeek Token Settings</span>
+        </div>
+        <button class="icon-btn" id="btnCloseSettings">&#10005;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Token Section -->
+        <div class="settings-section">
+          <label class="settings-label">DeepSeek Authorization Token (Bearer)</label>
+          <div class="settings-input-row">
+            <input type="password" id="settingTokenInput" class="settings-input" placeholder="Введите или вставьте токен вручную...">
+            <button class="action-btn-secondary" id="btnToggleTokenVisibility" title="Показать/скрыть токен" style="padding: 7px 10px;">👁</button>
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 5px;">
+            Токен авторизации для выполнения запросов через requests.
+          </div>
+        </div>
+
+        <!-- Selenium Auto-login Section -->
+        <div class="settings-section" style="margin-top: 16px;">
+          <label class="settings-label">Автоматический захват через Selenium</label>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+            Запустит Chrome на <code>chat.deepseek.com</code>. Как только вы войдете в аккаунт, токен и куки будут автоматически перехвачены и сохранены.
+          </p>
+          <button class="action-btn-primary" id="btnSettingsLaunchSelenium">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Войти через Selenium</span>
+          </button>
+        </div>
+
+        <!-- Session Info Section -->
+        <div class="settings-section" style="margin-top: 16px;">
+          <label class="settings-label">Информация о текущей сессии</label>
+          <div class="session-info-card">
+            <div>Статус авторизации: <strong id="settingsAuthStatusText" style="color: var(--accent-green);">Active</strong></div>
+            <div>Сохранено cookies: <strong id="settingsCookieCount">0</strong></div>
+            <div>Время сохранения: <span id="settingsSavedAt">-</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="action-btn-secondary" id="btnClearSession" style="color: var(--accent-red); border-color: rgba(239,68,68,0.3);">Очистить сессию</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="action-btn-secondary" id="btnCancelSettings">Отмена</button>
+          <button class="action-btn-primary" id="btnSaveToken">Сохранить токен</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/static/js/app.js"></script>
