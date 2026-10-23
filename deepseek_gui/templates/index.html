@@ -253,14 +253,19 @@
 
         <!-- Selenium Auto-login Section -->
         <div class="settings-section" style="margin-top: 16px;">
-          <label class="settings-label">Автоматический захват через Selenium</label>
+          <label class="settings-label">Автоматический вход через Selenium</label>
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
-            Запустит Chrome на <code>chat.deepseek.com</code>. Как только вы войдете в аккаунт, токен и куки будут автоматически перехвачены и сохранены.
+            Запустит настоящий Chrome на <code>chat.deepseek.com</code> без признаков автоматизации. Капча решается как в обычном браузере.
           </p>
-          <button class="action-btn-primary" id="btnSettingsLaunchSelenium">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <span>Войти через Selenium</span>
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button class="action-btn-primary" id="btnSettingsLaunchSelenium">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Войти через Chrome</span>
+            </button>
+            <button class="action-btn-secondary" id="btnResetBrowserProfile" title="Сбросить временный кэш и историю неудачных попыток капчи">
+              Сбросить кэш капчи
+            </button>
+          </div>
         </div>
 
         <!-- Session Info Section -->

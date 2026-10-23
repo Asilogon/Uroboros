@@ -136,6 +136,17 @@ def api_clear_settings():
     return jsonify({"success": True, "message": "Сессия очищена."})
 
 
+@app.route("/api/auth/reset_profile", methods=["POST"])
+def api_reset_profile():
+    global browser_instance
+    if browser_instance:
+        browser_instance.close()
+        browser_instance = None
+    b = DeepSeekBrowser()
+    b.reset_profile()
+    return jsonify({"success": True, "message": "Кэш браузера и история капчи успешно очищены."})
+
+
 @app.route("/api/auth/start_selenium", methods=["POST"])
 def api_start_selenium():
     global browser_instance, browser_thread

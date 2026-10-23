@@ -197,6 +197,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Reset Browser Profile / Captcha Cache
+  const btnResetBrowserProfile = document.getElementById("btnResetBrowserProfile");
+  if (btnResetBrowserProfile) {
+    btnResetBrowserProfile.addEventListener("click", async () => {
+      if (!confirm("Сбросить кэш капчи и историю попыток браузера?")) return;
+      btnResetBrowserProfile.disabled = true;
+      btnResetBrowserProfile.textContent = "Сброс...";
+      try {
+        const resp = await fetch("/api/auth/reset_profile", { method: "POST" });
+        const res = await resp.json();
+        alert(res.message || "Кэш капчи сброшен.");
+      } catch (err) {
+        alert("Ошибка сброса: " + err);
+      } finally {
+        btnResetBrowserProfile.disabled = false;
+        btnResetBrowserProfile.textContent = "Сбросить кэш капчи";
+      }
+    });
+  }
+
   loadSettingsData();
   setInterval(loadSettingsData, 6000);
 
