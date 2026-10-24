@@ -1,3 +1,4 @@
+# === PATCHED: stream incomplete handling ===
 import json
 import os
 import re
@@ -348,6 +349,26 @@ def api_send_message(chat_id):
                 ref_file_ids=valid_remote_file_ids,
             )
             for chunk in stream:
+                if isinstance(chunk, dict) and chunk.get('type') == 'incomplete':
+                    reason = chunk.get('reason', 'unknown')
+                    try:
+                        default_logger.log({
+                            'kind': 'stream_incomplete',
+                            'chat_session_id': chat_id,
+                            'reason': reason,
+                        })
+                    except Exception:
+                        pass
+                    err_data = {
+                        'type': 'error',
+                        'kind': 'connection_lost',
+                        'message': ('Соединение с DeepSeek потеряно, ответ неполный. '
+                                    'Нажмите «Отправить» ещё раз, чтобы продолжить.'),
+                        'reason': reason,
+                    }
+                    yield f"data: {json.dumps(err_data, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'done', 'incomplete': True})}\n\n"
+                    return
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except (GeneratorExit, Exception) as e:
@@ -1236,6 +1257,36 @@ def run_subagent_task_internal(project_id: str, agent_id: str, task_desc: str, t
             ans_text = res.get("text", "")
             ans_think = res.get("thinking", "")
             last_ans_text = ans_text
+            if not res.get('complete', True):
+                reason = res.get('incomplete_reason') or 'unknown'
+                try:
+                    default_logger.log({
+                        'kind': 'stream_incomplete',
+                        'chat_session_id': chat_id,
+                        'agent_id': agent_id,
+                        'reason': reason,
+                    })
+                except Exception:
+                    pass
+                incomplete_text = (
+                    '⚠️ Соединение с DeepSeek потеряно во время выполнения задачи. '
+                    'Ответ неполный. Попробуйте запустить задачу ещё раз.'
+                )
+                try:
+                    projects_manager.update_agent_task(project_id, agent_id, task_desc, status='error', progress=0)
+                    projects_manager.append_subagent_message(
+                        project_id, agent_id, role='ASSISTANT', text=incomplete_text
+                    )
+                except Exception:
+                    pass
+                return {
+                    'text': incomplete_text,
+                    'thinking': '',
+                    'executed_commands': [],
+                    'steps': sub_steps,
+                    'incomplete': True,
+                    'incomplete_reason': reason,
+                }
 
             if ans_think:
                 full_ans_think.append(ans_think)
@@ -1499,6 +1550,27 @@ def api_subagent_message(project_id, agent_id):
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "text":
                         collected_text.append(chunk["content"])
+                    elif chunk.get("type") == "incomplete":
+                        reason = chunk.get('reason', 'unknown')
+                        try:
+                            default_logger.log({
+                                'kind': 'stream_incomplete',
+                                'chat_session_id': chat_id,
+                                'agent_id': agent_id,
+                                'reason': reason,
+                            })
+                        except Exception:
+                            pass
+                        err_data = {
+                            'type': 'error',
+                            'kind': 'connection_lost',
+                            'message': ('Соединение с DeepSeek потеряно, ответ неполный. '
+                                        'Попробуйте отправить сообщение ещё раз.'),
+                            'reason': reason,
+                        }
+                        yield f"data: {json.dumps(err_data, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'incomplete': True})}\n\n"
+                        return
 
                 raw_ans = "".join(collected_text)
                 last_raw_ans = raw_ans
@@ -1912,6 +1984,27 @@ def api_project_lead_message(project_id):
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                     elif chunk["type"] == "text":
                         iter_text.append(chunk["content"])
+                    elif chunk.get("type") == "incomplete":
+                        reason = chunk.get('reason', 'unknown')
+                        try:
+                            default_logger.log({
+                                'kind': 'stream_incomplete',
+                                'chat_session_id': chat_id,
+                                'project_id': project_id,
+                                'reason': reason,
+                            })
+                        except Exception:
+                            pass
+                        err_data = {
+                            'type': 'error',
+                            'kind': 'connection_lost',
+                            'message': ('Соединение с DeepSeek потеряно, ответ неполный. '
+                                        'Попробуйте отправить сообщение ещё раз.'),
+                            'reason': reason,
+                        }
+                        yield f"data: {json.dumps(err_data, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'incomplete': True})}\n\n"
+                        return
 
                 raw_iter_ans = "".join(iter_text)
                 iter_think_str = "".join(iter_thinking)

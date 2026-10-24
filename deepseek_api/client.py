@@ -6,6 +6,20 @@ from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Union
 
 import requests
+from requests.exceptions import (
+    ChunkedEncodingError,
+    ConnectionError as RequestsConnectionError,
+    ReadTimeout,
+    RequestException,
+    SSLError,
+)
+
+try:  # IncompleteRead lives in different places on old/new urllib3
+    from urllib3.exceptions import IncompleteRead as UrllibIncompleteRead
+    from urllib3.exceptions import ProtocolError as UrllibProtocolError
+    _URLLIB_ERRORS = (UrllibIncompleteRead, UrllibProtocolError)
+except Exception:  # pragma: no cover
+    _URLLIB_ERRORS = tuple()
 
 from .logger import TrafficLogger, default_logger
 from .pow import PowSolver, default_pow_solver
@@ -13,6 +27,15 @@ from .pow import PowSolver, default_pow_solver
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SESSION_FILE = DATA_DIR / "session.json"
 BASE_URL = "https://chat.deepseek.com"
+
+# Tuple of network exceptions we treat as "connection lost during stream".
+_NETWORK_ERRORS = (
+    ChunkedEncodingError,
+    RequestsConnectionError,
+    ReadTimeout,
+    SSLError,
+    RequestException,
+) + _URLLIB_ERRORS
 
 
 class DeepSeekAPIError(Exception):
@@ -61,11 +84,9 @@ class DeepSeekClient:
 
             self.captured_headers = data.get("captured_headers", {})
 
-            # 1. Set Cookies
             cookies = data.get("cookies", [])
             for c in cookies:
                 domain = c.get("domain", "chat.deepseek.com")
-                # Remove leading dot if present for requests cookie jar compatibility
                 if domain.startswith("."):
                     domain = domain[1:]
                 self.http.cookies.set(
@@ -75,7 +96,6 @@ class DeepSeekClient:
                     path=c.get("path", "/"),
                 )
 
-            # 2. Base Headers
             self._update_default_headers()
             return True
         except Exception as e:
@@ -151,6 +171,12 @@ class DeepSeekClient:
 
         req_id = self._log_request(method, url, req_headers, body=json_data, files=files)
 
+        # For streaming we must use a (connect, read) tuple.
+        #   connect timeout = 30s (establish TCP+TLS)
+        #   read timeout    = 120s (wait for next chunk between SSE heartbeats ~8s)
+        # If we used a single 60s timeout it would abort on slow model "thinking" phases.
+        timeout = (30, 180) if stream else 60
+
         response = self.http.request(
             method=method,
             url=url,
@@ -159,7 +185,7 @@ class DeepSeekClient:
             files=files,
             headers=req_headers,
             stream=stream,
-            timeout=60,
+            timeout=timeout,
         )
 
         if not stream:
@@ -190,17 +216,12 @@ class DeepSeekClient:
         return None
 
     def get_user_info(self) -> Dict[str, Any]:
-        """Fetches current user profile and session info."""
         resp = self._request("GET", "/api/v0/users/current")
         if resp.status_code != 200:
             raise DeepSeekAPIError(f"Failed to fetch user info: {resp.status_code} - {resp.text}")
         return resp.json()
 
     def create_chat(self, agent: str = "chat") -> str:
-        """
-        Creates a new chat session.
-        Returns chat_session_id (UUID string).
-        """
         payload = {"character_id": None}
         resp = self._request("POST", "/api/v0/chat_session/create", json_data=payload)
         data = resp.json()
@@ -219,9 +240,6 @@ class DeepSeekClient:
         return cid
 
     def list_chats(self, page: int = 1, page_size: int = 30) -> List[Dict[str, Any]]:
-        """
-        Fetches list of existing chat sessions.
-        """
         resp = self._request(
             "GET",
             "/api/v0/chat_session/fetch_page",
@@ -234,9 +252,6 @@ class DeepSeekClient:
         return data.get("data", {}).get("biz_data", {}).get("chat_sessions", [])
 
     def delete_chat(self, chat_session_id: str) -> bool:
-        """
-        Deletes a chat session by ID.
-        """
         self._session_last_msg_ids.pop(chat_session_id, None)
         payload = {"chat_session_id": chat_session_id}
         resp = self._request("POST", "/api/v0/chat_session/delete", json_data=payload)
@@ -244,9 +259,6 @@ class DeepSeekClient:
         return data.get("code") == 0
 
     def get_chat_history(self, chat_session_id: str) -> List[Dict[str, Any]]:
-        """
-        Fetches messages in a specific chat session.
-        """
         resp = self._request(
             "GET",
             "/api/v0/chat/history_messages",
@@ -259,11 +271,6 @@ class DeepSeekClient:
         return data.get("data", {}).get("biz_data", {}).get("chat_messages", [])
 
     def get_last_message_id(self, chat_session_id: str) -> Optional[int]:
-        """
-        Fetches the latest message ID (u32) for the given chat session.
-        Used as parent_message_id for new turns so messages append sequentially
-        instead of branching or editing existing messages.
-        """
         if not chat_session_id:
             return None
         if chat_session_id in self._session_last_msg_ids and self._session_last_msg_ids[chat_session_id] is not None:
@@ -298,10 +305,6 @@ class DeepSeekClient:
         return None
 
     def upload_file(self, file_path: Union[str, Path]) -> Dict[str, Any]:
-        """
-        Uploads a file to DeepSeek file service.
-        Returns file metadata dictionary including 'id'.
-        """
         path = Path(file_path).resolve()
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
@@ -335,12 +338,16 @@ class DeepSeekClient:
     ) -> Union[Generator[Dict[str, Any], None, None], Dict[str, Any]]:
         """
         Sends a message to the chat.
-        If stream=True, yields delta chunks:
+
+        If stream=True, yields delta chunks with a final metadata chunk:
           {"type": "text"|"thinking", "content": "..."}
+          {"type": "incomplete", "reason": "..."}   # connection was lost
+          {"type": "complete"}                       # normal completion
+
         If stream=False, returns complete aggregated dict:
-          {"text": "...", "thinking": "...", "message_id": ...}
+          {"text": ..., "thinking": ..., "message_id": ...,
+           "complete": bool, "incomplete_reason": Optional[str]}
         """
-        # Resolve parent_message_id to append sequentially without branching or editing existing messages
         if parent_message_id is None:
             parent_message_id = self.get_last_message_id(chat_session_id)
         elif parent_message_id is not None:
@@ -349,7 +356,6 @@ class DeepSeekClient:
             except (ValueError, TypeError):
                 parent_message_id = None
 
-        # 1. Prepare PoW header if needed
         pow_header = self._ensure_pow_header("/api/v0/chat/completion")
         extra_headers = {}
         if pow_header:
@@ -378,131 +384,169 @@ class DeepSeekClient:
             )
 
         def event_stream_generator():
-            full_text = []
-            full_thinking = []
+            full_text: List[str] = []
+            full_thinking: List[str] = []
             current_type = "text"
+            saw_close_event = False
+            saw_done_marker = False
+            incomplete_reason: Optional[str] = None
 
-            for line in resp.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                line = line.strip()
-
-                # Handle raw non-SSE JSON error response (e.g. {"code": 40301, "msg": "..."})
-                if line.startswith("{") and line.endswith("}"):
-                    try:
-                        err_obj = json.loads(line)
-                        if err_obj.get("code", 0) != 0:
-                            raise DeepSeekAPIError(f"{err_obj.get('msg')} (code {err_obj.get('code')})")
-                    except json.JSONDecodeError:
-                        pass
-
-                if line == "event: close":
-                    break
-
-                if line.startswith("data: "):
-                    raw_data = line[6:].strip()
-                    if raw_data == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(raw_data)
-                    except json.JSONDecodeError:
+            try:
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line:
                         continue
+                    line = line.strip()
 
-                    # Capture response message ID to track parent for subsequent turns
-                    if isinstance(chunk, dict):
-                        if "response_message_id" in chunk:
-                            try:
-                                self._session_last_msg_ids[chat_session_id] = int(chunk["response_message_id"])
-                            except (ValueError, TypeError):
-                                pass
-                        elif "v" in chunk and isinstance(chunk["v"], dict) and "response" in chunk["v"]:
-                            resp_meta = chunk["v"]["response"]
-                            if isinstance(resp_meta, dict) and "message_id" in resp_meta:
+                    if line.startswith("{") and line.endswith("}"):
+                        try:
+                            err_obj = json.loads(line)
+                            if err_obj.get("code", 0) != 0:
+                                raise DeepSeekAPIError(
+                                    f"{err_obj.get('msg')} (code {err_obj.get('code')})"
+                                )
+                        except json.JSONDecodeError:
+                            pass
+
+                    if line == "event: close":
+                        saw_close_event = True
+                        break
+
+                    if line.startswith("data: "):
+                        raw_data = line[6:].strip()
+                        if raw_data == "[DONE]":
+                            saw_done_marker = True
+                            break
+                        try:
+                            chunk = json.loads(raw_data)
+                        except json.JSONDecodeError:
+                            continue
+
+                        if isinstance(chunk, dict):
+                            if "response_message_id" in chunk:
                                 try:
-                                    self._session_last_msg_ids[chat_session_id] = int(resp_meta["message_id"])
+                                    self._session_last_msg_ids[chat_session_id] = int(chunk["response_message_id"])
                                 except (ValueError, TypeError):
                                     pass
+                            elif "v" in chunk and isinstance(chunk["v"], dict) and "response" in chunk["v"]:
+                                resp_meta = chunk["v"]["response"]
+                                if isinstance(resp_meta, dict) and "message_id" in resp_meta:
+                                    try:
+                                        self._session_last_msg_ids[chat_session_id] = int(resp_meta["message_id"])
+                                    except (ValueError, TypeError):
+                                        pass
 
-                    # DeepSeek Web format 1: Initial response object with fragments
-                    # {"v": {"response": {"fragments": [{"type": "THINK", "content": "..."}]}}}
-                    if isinstance(chunk, dict) and "v" in chunk and isinstance(chunk["v"], dict):
-                        resp_obj = chunk["v"].get("response", {})
-                        for frag in resp_obj.get("fragments", []):
-                            frag_type = frag.get("type", "RESPONSE")
-                            current_type = "thinking" if frag_type == "THINK" else "text"
-                            content = frag.get("content", "")
-                            if content:
-                                if current_type == "thinking":
-                                    full_thinking.append(content)
-                                else:
-                                    full_text.append(content)
-                                yield {"type": current_type, "content": content, "raw": chunk}
-                        continue
+                        if isinstance(chunk, dict) and "v" in chunk and isinstance(chunk["v"], dict):
+                            resp_obj = chunk["v"].get("response", {})
+                            for frag in resp_obj.get("fragments", []):
+                                frag_type = frag.get("type", "RESPONSE")
+                                current_type = "thinking" if frag_type == "THINK" else "text"
+                                content = frag.get("content", "")
+                                if content:
+                                    if current_type == "thinking":
+                                        full_thinking.append(content)
+                                    else:
+                                        full_text.append(content)
+                                    yield {"type": current_type, "content": content, "raw": chunk}
+                            continue
 
-                    # DeepSeek Web format 2: New fragment added to response
-                    # {"p": "response/fragments", "o": "APPEND", "v": [{"id": 3, "type": "RESPONSE", "content": "..."}]}
-                    if isinstance(chunk, dict) and chunk.get("p") == "response/fragments" and chunk.get("o") == "APPEND":
-                        for frag in chunk.get("v", []):
-                            frag_type = frag.get("type", "RESPONSE")
-                            current_type = "thinking" if frag_type == "THINK" else "text"
-                            content = frag.get("content", "")
-                            if content:
-                                if current_type == "thinking":
-                                    full_thinking.append(content)
-                                else:
-                                    full_text.append(content)
-                                yield {"type": current_type, "content": content, "raw": chunk}
-                        continue
+                        if isinstance(chunk, dict) and chunk.get("p") == "response/fragments" and chunk.get("o") == "APPEND":
+                            for frag in chunk.get("v", []):
+                                frag_type = frag.get("type", "RESPONSE")
+                                current_type = "thinking" if frag_type == "THINK" else "text"
+                                content = frag.get("content", "")
+                                if content:
+                                    if current_type == "thinking":
+                                        full_thinking.append(content)
+                                    else:
+                                        full_text.append(content)
+                                    yield {"type": current_type, "content": content, "raw": chunk}
+                            continue
 
-                    # DeepSeek Web format 3: Content appended to current active fragment
-                    # {"p": "response/fragments/-1/content", "v": "..."} OR {"v": "..."}
-                    content = None
-                    if isinstance(chunk, dict):
-                        if chunk.get("p") == "response/fragments/-1/content":
-                            content = chunk.get("v")
-                        elif "v" in chunk and isinstance(chunk["v"], str) and "p" not in chunk:
-                            content = chunk["v"]
+                        content = None
+                        if isinstance(chunk, dict):
+                            if chunk.get("p") == "response/fragments/-1/content":
+                                content = chunk.get("v")
+                            elif "v" in chunk and isinstance(chunk["v"], str) and "p" not in chunk:
+                                content = chunk["v"]
 
-                    if content:
-                        if current_type == "thinking":
-                            full_thinking.append(content)
-                        else:
-                            full_text.append(content)
-                        yield {"type": current_type, "content": content, "raw": chunk}
-                        continue
-
-                    # Fallback format: OpenAI standard choices[0].delta
-                    choices = chunk.get("choices", []) if isinstance(chunk, dict) else []
-                    for choice in choices:
-                        delta = choice.get("delta", {})
-                        delta_type = delta.get("type", "text")
-                        delta_content = delta.get("content", "")
-                        if delta_content:
-                            if delta_type == "thinking":
-                                full_thinking.append(delta_content)
+                        if content:
+                            if current_type == "thinking":
+                                full_thinking.append(content)
                             else:
-                                full_text.append(delta_content)
-                            yield {"type": delta_type, "content": delta_content, "raw": chunk}
+                                full_text.append(content)
+                            yield {"type": current_type, "content": content, "raw": chunk}
+                            continue
+
+                        choices = chunk.get("choices", []) if isinstance(chunk, dict) else []
+                        for choice in choices:
+                            delta = choice.get("delta", {})
+                            delta_type = delta.get("type", "text")
+                            delta_content = delta.get("content", "")
+                            if delta_content:
+                                if delta_type == "thinking":
+                                    full_thinking.append(delta_content)
+                                else:
+                                    full_text.append(delta_content)
+                                yield {"type": delta_type, "content": delta_content, "raw": chunk}
+            except _NETWORK_ERRORS as e:
+                # Connection lost mid-stream. Emit an explicit marker so the caller
+                # can distinguish this from a normal completion.
+                incomplete_reason = f"network_error: {type(e).__name__}: {e}"
+                self.logger.log({
+                    "kind": "requests_client_stream_error",
+                    "url": "/api/v0/chat/completion",
+                    "chat_session_id": chat_session_id,
+                    "reason": incomplete_reason,
+                    "partial_text_len": sum(len(x) for x in full_text),
+                    "partial_thinking_len": sum(len(x) for x in full_thinking),
+                })
+            finally:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+            if incomplete_reason is None and not (saw_close_event or saw_done_marker):
+                incomplete_reason = "stream_ended_without_close_event"
+
+            if incomplete_reason:
+                yield {
+                    "type": "incomplete",
+                    "reason": incomplete_reason,
+                    "text": "".join(full_text),
+                    "thinking": "".join(full_thinking),
+                }
+            else:
+                yield {"type": "complete"}
 
         if stream:
             return event_stream_generator()
         else:
-            collected_text = []
-            collected_thinking = []
+            collected_text: List[str] = []
+            collected_thinking: List[str] = []
+            complete = True
+            incomplete_reason_val: Optional[str] = None
             for item in event_stream_generator():
-                if item["type"] == "thinking":
+                item_type = item.get("type")
+                if item_type == "thinking":
                     collected_thinking.append(item["content"])
-                else:
+                elif item_type == "text":
                     collected_text.append(item["content"])
+                elif item_type == "incomplete":
+                    complete = False
+                    incomplete_reason_val = item.get("reason")
+                elif item_type == "complete":
+                    complete = True
 
             return {
                 "text": "".join(collected_text),
                 "thinking": "".join(collected_thinking),
                 "message_id": self._session_last_msg_ids.get(chat_session_id),
+                "complete": complete,
+                "incomplete_reason": incomplete_reason_val,
             }
 
     def stop_generation(self, chat_session_id: str, message_id: Optional[Union[int, str]] = None) -> bool:
-        """Stops ongoing message generation."""
         payload = {"chat_session_id": chat_session_id}
         if message_id is not None:
             try:

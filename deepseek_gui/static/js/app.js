@@ -1106,6 +1106,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let hadStreamError = false;  // PATCHED: hadStreamError
 
       while (true) {
         const { value, done } = await reader.read();
@@ -1195,8 +1196,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 updateLiveActivity("✅ Задача выполнена", activeGeneration.activeAgentName, activeGeneration.activeAgentIcon, false);
               } else if (chunk.type === "error") {
-                mdBody.innerHTML += `<div style="color: #ef4444; margin-top: 6px;">[Ошибка: ${chunk.message}]</div>`;
-                updateLiveActivity(`Ошибка: ${chunk.message}`, activeGeneration.activeAgentName, activeGeneration.activeAgentIcon, false);
+                hadStreamError = true;
+                const errKind = chunk.kind || "error";
+                const errMsg = chunk.message || "Неизвестная ошибка";
+                mdBody.innerHTML += `<div style="color: #ef4444; margin-top: 6px;"><strong>[${errKind === "connection_lost" ? "Соединение потеряно" : "Ошибка"}]</strong> ${errMsg}</div>`;
+                updateLiveActivity(`Ошибка: ${errMsg}`, activeGeneration.activeAgentName, activeGeneration.activeAgentIcon, false);
               }
               messagesContainer.scrollTop = messagesContainer.scrollHeight;
             } catch (e) {}
@@ -1204,12 +1208,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      if (hadStreamError) {
+        updateLiveActivity("Ошибка: соединение с DeepSeek потеряно", activeGeneration.activeAgentName, activeGeneration.activeAgentIcon, false);
+        activeGeneration.streamErrored = true;
+      } else {
       // Finish generation state and display static completed tree
       const completedTreeTitle = isSolo ? `Действия агента (${liveSteps.length})` : `Действия команды (${liveSteps.length})`;
       const finalTree = buildActionStepsTreeElement(liveSteps, false, completedTreeTitle);
       treeContainerEl.replaceWith(finalTree);
       treeContainerEl = finalTree;
       activeGeneration.treeContainerEl = finalTree;
+      }
 
       footer.querySelector(".copy-ans").addEventListener("click", () => {
         navigator.clipboard.writeText(cleanUserFacingText(rawAccumulatedText));
