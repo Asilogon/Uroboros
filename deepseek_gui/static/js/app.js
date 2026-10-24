@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const topActiveProjectPill = document.getElementById("topActiveProjectPill");
   const topProjName = document.getElementById("topProjName");
   const topAuthStatusDot = document.getElementById("topAuthStatusDot");
-  const authStatusDot = document.getElementById("authStatusDot");
+  const appVersionBadge = document.getElementById("appVersionBadge");
   const btnThemeToggle = document.getElementById("btnThemeToggle");
   const themeLabelText = document.getElementById("themeLabelText");
 
@@ -2017,6 +2017,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===================================================================
   // 10. SETTINGS & AUTH STATUS
   // ===================================================================
+  async function loadAppVersion() {
+    try {
+      const resp = await fetch("/api/version");
+      const data = await resp.json();
+      if (appVersionBadge && data && data.version) {
+        appVersionBadge.textContent = "v" + data.version;
+        appVersionBadge.title = "Версия Uroboros: " + data.version;
+      }
+    } catch (e) {
+      console.warn("Failed to load app version", e);
+    }
+  }
+
   async function loadSettingsData() {
     try {
       const resp = await fetch("/api/status");
@@ -2026,9 +2039,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (topAuthStatusDot) {
         topAuthStatusDot.classList.toggle("offline", !isAuthed);
         topAuthStatusDot.title = isAuthed ? "Сессия активна" : "Требуется авторизация";
-      }
-      if (authStatusDot) {
-        authStatusDot.classList.toggle("offline", !isAuthed);
       }
       if (settingAuthIndicator) {
         settingAuthIndicator.classList.toggle("offline", !isAuthed);
@@ -2072,6 +2082,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnOpenSettings) btnOpenSettings.addEventListener("click", openSettings);
   if (btnOpenSettingsTop) btnOpenSettingsTop.addEventListener("click", openSettings);
   if (btnCloseSettings) btnCloseSettings.addEventListener("click", closeSettings);
+  loadAppVersion();
   if (btnCancelSettings) btnCancelSettings.addEventListener("click", closeSettings);
 
   if (settingsModal) {

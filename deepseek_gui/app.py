@@ -22,6 +22,7 @@ from deepseek_api import (
     default_logger,
 )
 from .projects_manager import projects_manager
+from .version import __version__
 
 app = Flask(
     __name__,
@@ -61,6 +62,12 @@ def save_local_chats(chats: List[Dict[str, Any]]):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(CHATS_FILE, "w", encoding="utf-8") as f:
         json.dump(chats, f, indent=2, ensure_ascii=False)
+
+
+@app.route("/api/version", methods=["GET"])
+def api_version():
+    """Returns the current application version."""
+    return jsonify({"version": __version__})
 
 
 @app.route("/")

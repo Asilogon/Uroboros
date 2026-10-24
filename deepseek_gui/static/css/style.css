@@ -423,6 +423,28 @@ html, body {
   color: var(--text-main);
 }
 
+/* Application version badge (shown next to Settings button) */
+.app-version-badge {
+  font-size: 10.5px;
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-muted);
+  background-color: var(--badge-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 1px 7px;
+  letter-spacing: 0.2px;
+  user-select: none;
+  cursor: default;
+  flex-shrink: 0;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.app-version-badge:hover {
+  color: var(--text-main);
+  border-color: var(--border-light);
+}
+
 /* =====================================================================
    CENTER WORKSPACE
    ===================================================================== */
