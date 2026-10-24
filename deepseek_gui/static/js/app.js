@@ -172,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const modelLabel = document.getElementById("modelLabel");
   const btnToggleReasoning = document.getElementById("btnToggleReasoning");
   const reasoningStatusLabel = document.getElementById("reasoningStatusLabel");
-  const btnGoToMindMap = document.getElementById("btnGoToMindMap");
+
 
   // DOM Elements - Mind Map
   const mindmapProjectTitle = document.getElementById("mindmapProjectTitle");
@@ -319,7 +319,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (tabBtnLeadChat) tabBtnLeadChat.addEventListener("click", () => switchView("chat"));
   if (tabBtnMindMap) tabBtnMindMap.addEventListener("click", () => switchView("mindmap"));
-  if (btnGoToMindMap) btnGoToMindMap.addEventListener("click", () => switchView("mindmap"));
+
+
 
   // ===================================================================
   // 4. PROJECTS MANAGEMENT (STARTS CLEAN FROM SCRATCH)
