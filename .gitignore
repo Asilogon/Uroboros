@@ -8,6 +8,9 @@ __pycache__/
 venv/
 env/
 
+# Portable MinGit (not committed)
+tools/_bin/
+
 # DeepSeek session data & profile
 data/session.json
 data/chats.json

@@ -1,3 +1,4 @@
+# === PATCHED: file_read_ranges ===
 # === PATCHED: stream incomplete handling ===
 import json
 import os
@@ -640,8 +641,18 @@ def write_project_file(project_root: str, file_path: str, content: str) -> Dict[
         }
 
 
-def read_project_file(project_root: str, file_path: str) -> Dict[str, Any]:
-    """Reads a file relative to project root."""
+def read_project_file(
+    project_root: str,
+    file_path: str,
+    start_line: Optional[int] = None,
+    end_line: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Reads a file (or a slice of lines) relative to project root.
+
+    start_line / end_line are 1-based and INCLUSIVE. Both None -> whole file.
+    Returns dict with keys: success, path, rel_path, content, size,
+    total_lines, start_line, end_line, truncated, next_start_line.
+    """
     try:
         root = Path(project_root).resolve()
         clean_rel = file_path.strip().lstrip("/\\")
@@ -653,13 +664,68 @@ def read_project_file(project_root: str, file_path: str) -> Dict[str, Any]:
                 "rel_path": clean_rel,
                 "error": f"Файл '{clean_rel}' не найден на диске",
             }
-        content = target.read_text(encoding="utf-8", errors="replace")
+        full_text = target.read_text(encoding="utf-8", errors="replace")
+        total_lines = full_text.count("\n") + (1 if full_text and not full_text.endswith("\n") else 0)
+        if total_lines == 0 and full_text:
+            total_lines = 1
+
+        if start_line is None and end_line is None:
+            return {
+                "success": True,
+                "path": str(target),
+                "rel_path": clean_rel,
+                "content": full_text,
+                "size": len(full_text.encode("utf-8")),
+                "total_lines": total_lines,
+                "start_line": 1 if total_lines else 0,
+                "end_line": total_lines,
+                "truncated": False,
+                "next_start_line": None,
+            }
+
+        try:
+            sl = int(start_line) if start_line is not None else 1
+        except (TypeError, ValueError):
+            sl = 1
+        try:
+            el = int(end_line) if end_line is not None else total_lines
+        except (TypeError, ValueError):
+            el = total_lines
+        if sl < 1:
+            sl = 1
+        if el < sl:
+            return {
+                "success": False,
+                "path": str(target),
+                "rel_path": clean_rel,
+                "total_lines": total_lines,
+                "error": f"end_line ({el}) < start_line ({sl})",
+            }
+        if sl > total_lines:
+            return {
+                "success": False,
+                "path": str(target),
+                "rel_path": clean_rel,
+                "total_lines": total_lines,
+                "error": f"start_line ({sl}) за пределами файла (всего строк: {total_lines})",
+            }
+        if el > total_lines:
+            el = total_lines
+
+        lines = full_text.splitlines(keepends=True)
+        slice_text = "".join(lines[sl - 1:el])
+        truncated = el < total_lines
         return {
             "success": True,
             "path": str(target),
             "rel_path": clean_rel,
-            "content": content,
-            "size": len(content.encode("utf-8")),
+            "content": slice_text,
+            "size": len(slice_text.encode("utf-8")),
+            "total_lines": total_lines,
+            "start_line": sl,
+            "end_line": el,
+            "truncated": truncated,
+            "next_start_line": (el + 1) if truncated else None,
         }
     except Exception as e:
         return {
@@ -1221,6 +1287,7 @@ def run_subagent_task_internal(project_id: str, agent_id: str, task_desc: str, t
         "    },\n"
         "    {\n"
         "      \"type\": \"file_read\",\n"
+        "      \"start_line\": 1, \"end_line\": 500,   // ОПЦИОНАЛЬНО: диапазон строк (1-based, включительно)\n"
         "      \"path\": \"относительный_путь_к_файлу\"\n"
         "    },\n"
         "    {\n"
@@ -1350,16 +1417,28 @@ def run_subagent_task_internal(project_id: str, agent_id: str, task_desc: str, t
                     )
                 elif a_type == "file_read":
                     path = act.get("path", "").strip()
-                    r_res = read_project_file(project_root, path)
+                    _sl = act.get("start_line")
+                    _el = act.get("end_line")
+                    r_res = read_project_file(project_root, path, start_line=_sl, end_line=_el)
+                    _title = (f"Read file {path} (lines {r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))})"
+                              if (_sl is not None or _el is not None) and r_res.get("success") else f"Read file {path}")
                     sub_steps.append({
                         "category": "file_read",
-                        "title": f"Read file {path}",
+                        "title": _title,
                         "file_path": path,
+                        "start_line": r_res.get("start_line"),
+                        "end_line": r_res.get("end_line"),
+                        "total_lines": r_res.get("total_lines"),
                         "success": r_res.get("success", False),
                         "output": r_res.get("content", r_res.get("error", "")),
                     })
                     file_content = r_res.get("content", r_res.get("error", ""))
-                    turn_observations.append(f"[Содержимое файла '{path}']:\n{file_content}")
+                    _hint = ""
+                    if r_res.get("truncated"):
+                        _hint = (f"\n[Файл '{path}' показан частично: строки "
+                                 f"{r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))} из {r_res.get(chr(39)+'total_lines'+chr(39))}. "
+                                 f"Чтобы прочитать дальше, вызови file_read с start_line={r_res.get(chr(39)+'next_start_line'+chr(39))}.")
+                    turn_observations.append(f"[Содержимое файла '{path}']:\n{file_content}{_hint}")
                 elif a_type == "cmd":
                     cmd_str = act.get("command", "").strip()
                     cmd_res = execute_shell_command(cmd_str, cwd=project_root)
@@ -1678,18 +1757,30 @@ def api_subagent_message(project_id, agent_id):
                         )
                     elif a_type == "file_read":
                         path = act.get("path", "").strip()
-                        r_res = read_project_file(project_root, path)
+                        _sl = act.get("start_line")
+                        _el = act.get("end_line")
+                        r_res = read_project_file(project_root, path, start_line=_sl, end_line=_el)
+                        _title = (f"Read file {path} (lines {r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))})"
+                                  if (_sl is not None or _el is not None) and r_res.get("success") else f"Read file {path}")
                         read_step = {
                             "category": "file_read",
-                            "title": f"Read file {path}",
+                            "title": _title,
                             "file_path": path,
+                            "start_line": r_res.get("start_line"),
+                            "end_line": r_res.get("end_line"),
+                            "total_lines": r_res.get("total_lines"),
                             "success": r_res.get("success", False),
                             "output": r_res.get("content", r_res.get("error", "")),
                         }
                         all_accumulated_steps.append(read_step)
                         yield f"data: {json.dumps({'type': 'action_step', 'step': read_step}, ensure_ascii=False)}\n\n"
                         file_content = r_res.get("content", r_res.get("error", ""))
-                        turn_observations.append(f"[Содержимое файла '{path}']:\n{file_content}")
+                        _hint = ""
+                        if r_res.get("truncated"):
+                            _hint = (f"\n[Файл '{path}' показан частично: строки "
+                                     f"{r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))} из {r_res.get(chr(39)+'total_lines'+chr(39))}. "
+                                     f"Чтобы прочитать дальше, вызови file_read с start_line={r_res.get(chr(39)+'next_start_line'+chr(39))}.")
+                        turn_observations.append(f"[Содержимое файла '{path}']:\n{file_content}{_hint}")
 
                     elif a_type == "cmd":
                         cmd_str = act.get("command", "").strip()
@@ -1840,7 +1931,7 @@ def api_project_lead_message(project_id):
                 "Все задачи пользователя ты решаешь ПОЛНОСТЬЮ САМОСТОЯТЕЛЬНО от начала до конца:\n"
                 "- Лично пишешь весь программный код, разметку, стили и скрипты.\n"
                 "- Физически создаёшь и сохраняешь файлы на диск через действие `file_write` в рабочую папку ({project_root}).\n"
-                "- Проверяешь существующие файлы через `file_read`.\n"
+                "- Проверяешь существующие файлы через `file_read`. ОПЦИОНАЛЬНО для больших файлов: `file_read` поддерживает постраничное чтение через поля `start_line` и `end_line` (1-based, включительно). Пример: {\"type\": \"file_read\", \"path\": \"deepseek_gui/app.py\", \"start_line\": 100, \"end_line\": 499}. Если в ответе помечено, что файл показан частично — дочитай следующий диапазон с start_line=next_start_line. Разбивай большие файлы на куски по 400-500 строк.\n"
                 "- Запускаешь консольные команды (тесты, скрипты, запуск) через действие `cmd`.\n"
                 "- Ты НЕ используешь действия `to_agent` и `spawn_agent` — субагентов нет, всю работу ты делаешь сам.\n\n"
                 "СТРОЖАЙШЕЕ ПРАВИЛО ОБЩЕНИЯ С ПОЛЬЗОВАТЕЛЕМ (КРИТИЧЕСКИ ВАЖНО):\n"
@@ -1866,6 +1957,7 @@ def api_project_lead_message(project_id):
                 "    },\n"
                 "    {\n"
                 "      \"type\": \"file_read\",\n"
+        "      \"start_line\": 1, \"end_line\": 500,   // ОПЦИОНАЛЬНО: диапазон строк (1-based, включительно)\n"
                 "      \"path\": \"относительный_путь/имя_файла\"\n"
                 "    },\n"
                 "    {\n"
@@ -1894,7 +1986,7 @@ def api_project_lead_message(project_id):
                 "   Никогда не верь подчинённым на слово! Подчинённый может написать «всё готово», но не сохранить файл или сделать ошибку.\n"
                 "   Перед тем как отчитаться пользователю, ТЫ ОБЯЗАН ПРОВЕСТИ АУДИТ:\n"
                 "   - Проверь отчёт системы: действительно ли файлы физически созданы/сохранены на диске через `file_write`?\n"
-                "   - Если нужно — лично прочитай созданный файл через `file_read` или проверь консольной командой через `cmd`.\n"
+                "   - Если нужно — лично прочитай созданный файл через `file_read` или проверь консольной командой через `cmd`. ОПЦИОНАЛЬНО для больших файлов: `file_read` поддерживает постраничное чтение через поля `start_line` и `end_line` (1-based, включительно). Пример: {\"type\": \"file_read\", \"path\": \"deepseek_gui/app.py\", \"start_line\": 100, \"end_line\": 499}. Если в ответе помечено, что файл показан частично — дочитай следующий диапазон с start_line=next_start_line. Разбивай большие файлы на куски по 400-500 строк.\n"
                 "   - Если подчинённый не выполнил задачу, не сохранил файл или допустил брак — ВЕРНИ ЗАДАЧУ СУБАГЕНТУ через `to_agent` с указанием конкретных замечаний!\n"
                 "   - Принимай работу только тогда, когда лично убедился в её 100% готовности.\n\n"
                 "3. СТРОЖАЙШЕЕ ПРАВИЛО ОБЩЕНИЯ С ПОЛЬЗОВАТЕЛЕМ (КРИТИЧЕСКИ ВАЖНО):\n"
@@ -1935,6 +2027,7 @@ def api_project_lead_message(project_id):
                 "    },\n"
                 "    {\n"
                 "      \"type\": \"file_read\",\n"
+        "      \"start_line\": 1, \"end_line\": 500,   // ОПЦИОНАЛЬНО: диапазон строк (1-based, включительно)\n"
                 "      \"path\": \"относительный_путь для проверки/аудита\"\n"
                 "    },\n"
                 "    {\n"
@@ -2055,17 +2148,29 @@ def api_project_lead_message(project_id):
 
                     elif a_type == "file_read":
                         path = act.get("path", "").strip()
-                        r_res = read_project_file(project_root, path)
+                        _sl = act.get("start_line")
+                        _el = act.get("end_line")
+                        r_res = read_project_file(project_root, path, start_line=_sl, end_line=_el)
+                        _title = (f"Read file {path} (lines {r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))})"
+                                  if (_sl is not None or _el is not None) and r_res.get("success") else f"Read file {path}")
                         read_step = {
                             "category": "file_read",
-                            "title": f"Read file {path}",
+                            "title": _title,
                             "file_path": path,
+                            "start_line": r_res.get("start_line"),
+                            "end_line": r_res.get("end_line"),
+                            "total_lines": r_res.get("total_lines"),
                             "success": r_res.get("success", False),
                             "output": r_res.get("content", r_res.get("error", "")),
                         }
                         all_accumulated_steps.append(read_step)
                         yield f"data: {json.dumps({'type': 'action_step', 'step': read_step}, ensure_ascii=False)}\n\n"
-                        step_observations.append(f"[Содержимое файла '{path}']:\n{r_res.get('content', r_res.get('error', ''))}")
+                        _hint = ""
+                        if r_res.get("truncated"):
+                            _hint = (f"\n[Файл '{path}' показан частично: строки "
+                                     f"{r_res.get(chr(39)+'start_line'+chr(39))}-{r_res.get(chr(39)+'end_line'+chr(39))} из {r_res.get(chr(39)+'total_lines'+chr(39))}. "
+                                     f"Чтобы прочитать дальше, вызови file_read с start_line={r_res.get(chr(39)+'next_start_line'+chr(39))}.")
+                        step_observations.append(f"[Содержимое файла '{path}']:\n{r_res.get('content', r_res.get('error', ''))}{_hint}")
 
                     elif a_type == "cmd":
                         cmd_str = act.get("command", "").strip()
