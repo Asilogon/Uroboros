@@ -640,6 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
         else if (st.category === "subagent") iconChar = st.agent_icon || "🤖";
         else if (st.category === "file") iconChar = "📄";
         else if (st.category === "file_read") iconChar = "📖";
+        else if (st.category === "web") iconChar = "🌐";
 
         const iconSpan = document.createElement("span");
         iconSpan.className = "step-icon";
@@ -667,7 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stepItem.appendChild(summaryRow);
 
         // Detail box if expandable
-        if (st.thought || st.output !== undefined || st.answer || st.category === "file" || st.category === "file_read") {
+        if (st.thought || st.output !== undefined || st.answer || st.category === "file" || st.category === "file_read" || st.category === "web") {
           const detailBox = document.createElement("div");
           detailBox.className = "step-detail-box";
           detailBox.style.display = "none";
@@ -686,6 +687,19 @@ document.addEventListener("DOMContentLoaded", () => {
               ${st.full_path ? `<div><strong>Полный путь:</strong> <span style="font-size:11px;opacity:0.8;">${escapeHtml(st.full_path)}</span></div>` : ""}
             `;
             detailBox.appendChild(fBox);
+          } else if (st.category === "web") {
+            const wBox = document.createElement("div");
+            wBox.className = "step-web-box";
+            const wUrl = st.url || "";
+            const wSafe = escapeHtml(wUrl);
+            const wPreview = st.preview ? escapeHtml(String(st.preview).substring(0, 4000)) : "";
+            wBox.innerHTML = "<div><strong>URL:</strong> <a href=\"" + wSafe + "\" target=\"_blank\" rel=\"noopener\">" + wSafe + "</a></div>"
+              + (st.status_code !== undefined && st.status_code !== null ? "<div><strong>Status:</strong> " + st.status_code + "</div>" : "")
+              + (st.content_type ? "<div><strong>Content-Type:</strong> " + escapeHtml(st.content_type) + "</div>" : "")
+              + (st.size !== undefined ? "<div><strong>Size:</strong> " + st.size + " bytes</div>" : "")
+              + (st.saved_path ? "<div><strong>Saved:</strong> <code>" + escapeHtml(st.saved_path) + "</code></div>" : "")
+              + (wPreview ? "<pre class=\"step-web-preview\">" + wPreview + "</pre>" : "");
+            detailBox.appendChild(wBox);
           } else if (st.output !== undefined) {
             const cPre = document.createElement("pre");
             cPre.className = "step-cmd-output";

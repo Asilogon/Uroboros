@@ -1,20 +1,17 @@
 """Commit all tracked changes in the Uroboros repo using dulwich (no git.exe needed)."""
-import os
 import sys
 from pathlib import Path
 
 from dulwich import porcelain
 from dulwich.repo import Repo
-from dulwich.objects import Commit
 
 ROOT = Path(__file__).resolve().parent
 
 NAME = 'Uroboros Bot'
 EMAIL = 'uroboros-bot@local'
-MESSAGE = sys.argv[1] if len(sys.argv) > 1 else 'chore: add app version badge (v0.0.1)'
+MESSAGE = sys.argv[1] if len(sys.argv) > 1 else 'chore: bump version and add web tool'
 
-repo_path = str(ROOT)
-repo = Repo(repo_path)
+repo = Repo(str(ROOT))
 
 # 1. Ensure user identity in config
 cfg = repo.get_config()
@@ -30,21 +27,11 @@ except Exception as e:
 head = repo.head()
 print(f'[HEAD] {head.decode()}')
 
-# Try to find feature/deepseek branch ref
-refs = repo.get_refs()
-print(f'[REFS] {sorted(k.decode() for k in refs.keys())}')
-
-# 3. Stage all changes (porcelain.add respects .gitignore)
-# We'll add specific files explicitly to be safe, plus report status
-status = porcelain.status(repo)
-print(f'[STATUS] staged={len(status.staged.get("add", []))} untracked={len(status.untracked)} unstaged={len(status.unstaged)}')
-print(f'[STATUS] untracked files: {status.untracked[:20]}')
-print(f'[STATUS] unstaged files: {status.unstaged[:20]}')
-
-# Explicitly add the files we changed/created
+# 3. Stage the files we changed/created
 files_to_add = [
     'VERSION',
     'deepseek_gui/version.py',
+    'deepseek_gui/web_tool.py',
     'deepseek_gui/app.py',
     'deepseek_gui/templates/index.html',
     'deepseek_gui/static/css/style.css',
@@ -54,6 +41,11 @@ files_to_add = [
     'apply_version_patch.py',
     'fix_js_version_init.py',
     'commit_changes.py',
+    'patch_web_tool.py',
+    'patch_web_js.py',
+    'patch_web_js2.py',
+    'restore_appjs.py',
+    'test_web_tool.py',
 ]
 
 for f in files_to_add:

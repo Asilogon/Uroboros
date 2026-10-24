@@ -23,6 +23,7 @@ from deepseek_api import (
 )
 from .projects_manager import projects_manager
 from .version import __version__
+from .web_tool import web_fetch
 
 app = Flask(
     __name__,
@@ -1270,6 +1271,32 @@ def run_subagent_task_internal(project_id: str, agent_id: str, task_desc: str, t
                         "success": w_res.get("success", False),
                     })
                     turn_observations.append(f"[Файл '{path}' успешно сохранен на диске ({w_res.get('size', 0)} байт)]")
+                elif a_type in ("web", "web_fetch"):
+                    w_url = (act.get("url") or "").strip()
+                    w_save = (act.get("save_to") or act.get("save_path") or "").strip() or None
+                    w_res = web_fetch(w_url, save_path=w_save, project_root=project_root)
+                    w_preview = w_res.get("preview", "")
+                    web_step = {
+                        "category": "web",
+                        "title": f"Fetched {w_url}",
+                        "url": w_url,
+                        "final_url": w_res.get("final_url", w_url),
+                        "status_code": w_res.get("status_code"),
+                        "content_type": w_res.get("content_type", ""),
+                        "size": w_res.get("size", 0),
+                        "saved_path": w_res.get("saved_path"),
+                        "save_error": w_res.get("save_error"),
+                        "preview": w_preview,
+                        "success": w_res.get("success", False),
+                        "output": w_preview,
+                    }
+                    sub_steps.append(web_step)
+                    turn_observations.append(
+                        "[WEB " + w_url + " status=" + str(w_res.get('status_code'))
+                        + " size=" + str(w_res.get('size', 0))
+                        + " saved=" + str(w_res.get('saved_path')) + "]\n"
+                        + w_preview[:4000]
+                    )
                 elif a_type == "file_read":
                     path = act.get("path", "").strip()
                     r_res = read_project_file(project_root, path)
@@ -1523,6 +1550,60 @@ def api_subagent_message(project_id, agent_id):
                         yield f"data: {json.dumps({'type': 'action_step', 'step': file_step}, ensure_ascii=False)}\n\n"
                         turn_observations.append(f"[Файл '{path}' сохранен на диске ({w_res.get('size', 0)} байт)]")
 
+                    elif a_type in ("web", "web_fetch"):
+                        w_url = (act.get("url") or "").strip()
+                        w_save = (act.get("save_to") or act.get("save_path") or "").strip() or None
+                        w_res = web_fetch(w_url, save_path=w_save, project_root=project_root)
+                        w_preview = w_res.get("preview", "")
+                        web_step = {
+                            "category": "web",
+                            "title": f"Fetched {w_url}",
+                            "url": w_url,
+                            "final_url": w_res.get("final_url", w_url),
+                            "status_code": w_res.get("status_code"),
+                            "content_type": w_res.get("content_type", ""),
+                            "size": w_res.get("size", 0),
+                            "saved_path": w_res.get("saved_path"),
+                            "save_error": w_res.get("save_error"),
+                            "preview": w_preview,
+                            "success": w_res.get("success", False),
+                            "output": w_preview,
+                        }
+                        all_accumulated_steps.append(web_step)
+                        yield "data: " + json.dumps({"type": "action_step", "step": web_step}, ensure_ascii=False) + "\n\n"
+                        turn_observations.append(
+                            "[WEB " + w_url + " status=" + str(w_res.get('status_code'))
+                            + " size=" + str(w_res.get('size', 0))
+                            + " saved=" + str(w_res.get('saved_path')) + "]\n"
+                            + w_preview[:4000]
+                        )
+                    elif a_type in ("web", "web_fetch"):
+                        w_url = (act.get("url") or "").strip()
+                        w_save = (act.get("save_to") or act.get("save_path") or "").strip() or None
+                        w_res = web_fetch(w_url, save_path=w_save, project_root=project_root)
+                        w_preview = w_res.get("preview", "")
+                        web_step = {
+                            "category": "web",
+                            "title": f"Fetched {w_url}",
+                            "url": w_url,
+                            "final_url": w_res.get("final_url", w_url),
+                            "status_code": w_res.get("status_code"),
+                            "content_type": w_res.get("content_type", ""),
+                            "size": w_res.get("size", 0),
+                            "saved_path": w_res.get("saved_path"),
+                            "save_error": w_res.get("save_error"),
+                            "preview": w_preview,
+                            "success": w_res.get("success", False),
+                            "output": w_preview,
+                        }
+                        all_accumulated_steps.append(web_step)
+                        yield "data: " + json.dumps({"type": "action_step", "step": web_step}, ensure_ascii=False) + "\n\n"
+                        turn_observations.append(
+                            "[WEB " + w_url + " status=" + str(w_res.get('status_code'))
+                            + " size=" + str(w_res.get('size', 0))
+                            + " saved=" + str(w_res.get('saved_path')) + "]\n"
+                            + w_preview[:4000]
+                        )
                     elif a_type == "file_read":
                         path = act.get("path", "").strip()
                         r_res = read_project_file(project_root, path)
